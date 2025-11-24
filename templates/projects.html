@@ -1,0 +1,1064 @@
+{% extends "base.html" %}
+
+{% block title %}项目配置 - Fusion-AI日志记录系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- 页面标题和新增按钮 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="mb-0" style="font-weight: 600; color: #1d1d1f;">
+                    <i class="bi bi-folder"></i> 项目配置
+                </h4>
+                <p class="text-muted mb-0" style="font-size: 14px; margin-top: 4px;">管理您的项目信息</p>
+            </div>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProjectModal">
+                <i class="bi bi-plus-circle"></i> 新增项目
+            </button>
+        </div>
+
+        <!-- 项目卡片网格 -->
+        <div id="projectsList" class="row g-4">
+            <div class="col-12">
+                <p class="text-muted text-center">加载中...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增项目模态框 -->
+<div class="modal fade" id="addProjectModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">新增项目</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="projectForm">
+                    <div class="mb-3">
+                        <label class="form-label">项目名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="project_name" placeholder="例如：北京高博医院" required>
+                        <small class="text-muted">提示：项目名称一般以医院名称命名</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">医院名称</label>
+                        <input type="text" class="form-control" id="project_hospital_name" placeholder="用于IP定位匹配">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">地域/城市 <span class="text-danger">*</span></label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <select class="form-select" id="project_province" required style="font-size: 14px;">
+                                    <option value="">请选择省份</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select class="form-select" id="project_city" required style="font-size: 14px;" disabled>
+                                    <option value="">请先选择省份</option>
+                                </select>
+                            </div>
+                        </div>
+                        <input type="hidden" id="project_region" name="region">
+                        <small class="text-muted">用于IP定位自动匹配项目，请选择到具体的地级市</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目范围</label>
+                        <div class="scope-tags-container" id="project_scope_tags" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border: 0.5px solid rgba(0, 0, 0, 0.2); border-radius: 10px; background-color: rgba(255, 255, 255, 0.8); min-height: 60px;">
+                            <!-- 标签将通过JavaScript动态生成 -->
+                        </div>
+                        <input type="hidden" id="project_scope" name="project_scope">
+                        <small class="text-muted">点击标签进行多选，多个选项用"、"分隔</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">项目经理</label>
+                                <input type="text" class="form-control" id="project_manager" placeholder="项目经理姓名">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">研发经理</label>
+                                <input type="text" class="form-control" id="dev_manager" placeholder="研发经理姓名">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">商务经理</label>
+                                <input type="text" class="form-control" id="business_manager" placeholder="商务经理姓名">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目目标</label>
+                        <textarea class="form-control" id="project_goal" rows="3" placeholder="请输入项目目标"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目状态</label>
+                        <select class="form-select" id="project_status">
+                            <option value="">请选择项目状态</option>
+                            <option value="进行中">进行中</option>
+                            <option value="已完成">已完成</option>
+                            <option value="暂停">暂停</option>
+                            <option value="待启动">待启动</option>
+                            <option value="已取消">已取消</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">医院Logo</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <input type="file" class="form-control" id="hospital_logo" accept="image/*" style="flex: 1;">
+                            <div id="logo_preview" style="width: 80px; height: 80px; border: 1px solid #ddd; border-radius: 4px; display: none; overflow: hidden; background: #f5f5f5;">
+                                <img id="logo_preview_img" src="" alt="Logo预览" style="width: 100%; height: 100%; object-fit: contain;">
+                            </div>
+                        </div>
+                        <small class="text-muted">支持 JPG、PNG 格式，建议尺寸 200x200 像素</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">报告模板</label>
+                        <input type="file" class="form-control" id="report_template" accept=".docx,.doc">
+                        <small class="text-muted">支持 DOCX、DOC 格式。如不上传，将使用系统默认模板</small>
+                        <div id="template_file_name" class="mt-2" style="display: none;">
+                            <span class="badge bg-info">已选择: <span id="template_file_name_text"></span></span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="createProject()">添加项目</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑项目模态框 -->
+<div class="modal fade" id="editProjectModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑项目</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProjectForm">
+                    <input type="hidden" id="edit_project_id">
+                    <div class="mb-3">
+                        <label class="form-label">项目名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit_project_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">医院名称</label>
+                        <input type="text" class="form-control" id="edit_hospital_name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">地域/城市 <span class="text-danger">*</span></label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <select class="form-select" id="edit_province" required style="font-size: 14px;">
+                                    <option value="">请选择省份</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select class="form-select" id="edit_city" required style="font-size: 14px;" disabled>
+                                    <option value="">请先选择省份</option>
+                                </select>
+                            </div>
+                        </div>
+                        <input type="hidden" id="edit_region">
+                        <small class="text-muted">用于IP定位自动匹配项目，请选择到具体的地级市</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目范围</label>
+                        <div class="scope-tags-container" id="edit_project_scope_tags" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border: 0.5px solid rgba(0, 0, 0, 0.2); border-radius: 10px; background-color: rgba(255, 255, 255, 0.8); min-height: 60px;">
+                            <!-- 标签将通过JavaScript动态生成 -->
+                        </div>
+                        <input type="hidden" id="edit_project_scope" name="edit_project_scope">
+                        <small class="text-muted">点击标签进行多选，多个选项用"、"分隔</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">项目经理</label>
+                                <input type="text" class="form-control" id="edit_project_manager">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">研发经理</label>
+                                <input type="text" class="form-control" id="edit_dev_manager">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">商务经理</label>
+                                <input type="text" class="form-control" id="edit_business_manager">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目目标</label>
+                        <textarea class="form-control" id="edit_project_goal" rows="3" placeholder="请输入项目目标"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目状态</label>
+                        <select class="form-select" id="edit_project_status">
+                            <option value="">请选择项目状态</option>
+                            <option value="进行中">进行中</option>
+                            <option value="已完成">已完成</option>
+                            <option value="暂停">暂停</option>
+                            <option value="待启动">待启动</option>
+                            <option value="已取消">已取消</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">医院Logo</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <input type="file" class="form-control" id="edit_hospital_logo" accept="image/*" style="flex: 1;">
+                            <div id="edit_logo_preview" style="width: 80px; height: 80px; border: 1px solid #ddd; border-radius: 4px; display: none; overflow: hidden; background: #f5f5f5;">
+                                <img id="edit_logo_preview_img" src="" alt="Logo预览" style="width: 100%; height: 100%; object-fit: contain;">
+                            </div>
+                        </div>
+                        <small class="text-muted">支持 JPG、PNG 格式，建议尺寸 200x200 像素</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">报告模板</label>
+                        <input type="file" class="form-control" id="edit_report_template" accept=".docx,.doc">
+                        <small class="text-muted">支持 DOCX、DOC 格式。如不上传，将使用系统默认模板</small>
+                        <div id="edit_template_file_name" class="mt-2" style="display: none;">
+                            <span class="badge bg-info">已选择: <span id="edit_template_file_name_text"></span></span>
+                        </div>
+                        <div id="edit_template_current_file" class="mt-2" style="display: none;">
+                            <span class="badge bg-secondary">当前模板: <span id="edit_template_current_file_text"></span></span>
+                            <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="edit_remove_template">移除</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveProject()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.project-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.scope-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1.5px solid rgba(0, 0, 0, 0.2);
+    background-color: rgba(255, 255, 255, 0.9);
+    color: #1d1d1f;
+    user-select: none;
+}
+
+.scope-tag:hover {
+    background-color: rgba(255, 107, 53, 0.1);
+    border-color: rgba(255, 107, 53, 0.4);
+    transform: translateY(-1px);
+}
+
+.scope-tag.selected {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(255, 107, 53, 0.25) 100%);
+    border-color: #ff6b35;
+    color: #ff6b35;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.2);
+}
+
+.scope-tag.selected:hover {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.25) 0%, rgba(255, 107, 53, 0.35) 100%);
+    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+</style>
+<script>
+$(document).ready(function() {
+    loadProjects();
+    loadCities();
+    
+    // Logo预览功能
+    $('#hospital_logo').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                $(this).val('');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#logo_preview').show();
+                $('#logo_preview_img').attr('src', e.target.result);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            $('#logo_preview').hide();
+        }
+    });
+    
+    $('#edit_hospital_logo').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                $(this).val('');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#edit_logo_preview').show();
+                $('#edit_logo_preview_img').attr('src', e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 绑定项目名称输入后的自动定位（新增）
+    $('#project_name').on('blur', function() {
+        const name = ($(this).val() || '').trim();
+        autoMatchRegionFromProjectName(name, false);
+    });
+
+    // 绑定项目名称输入后的自动定位（编辑）
+    $('#edit_project_name').on('blur', function() {
+        const name = ($(this).val() || '').trim();
+        autoMatchRegionFromProjectName(name, true);
+    });
+
+    // 绑定医院名称输入后的自动定位（新增/编辑都触发）
+    $('#project_hospital_name').on('blur', function() {
+        autoMatchRegionFromProjectName($('#project_name').val() || '', false);
+    });
+    $('#edit_hospital_name').on('blur', function() {
+        autoMatchRegionFromProjectName($('#edit_project_name').val() || '', true);
+    });
+});
+
+function loadCities() {
+    // 加载省份列表
+    $.get('/api/cities', function(response) {
+        if (response.type === 'all') {
+            populateProvinceSelect(response.data, $('#project_province'));
+            populateProvinceSelect(response.data, $('#edit_province'));
+        }
+    });
+}
+
+function populateProvinceSelect(citiesData, selectElement) {
+    let html = '<option value="">请选择省份</option>';
+    
+    // 遍历所有省份
+    for (const [province, cities] of Object.entries(citiesData)) {
+        html += `<option value="${province}">${province}</option>`;
+    }
+    
+    selectElement.html(html);
+}
+
+// 省份选择变化时，加载对应的城市
+$(document).on('change', '#project_province, #edit_province', function() {
+    const province = $(this).val();
+    const isEdit = $(this).attr('id') === 'edit_province';
+    const citySelect = isEdit ? $('#edit_city') : $('#project_city');
+    const regionInput = isEdit ? $('#edit_region') : $('#project_region');
+    
+    if (!province) {
+        citySelect.html('<option value="">请先选择省份</option>').prop('disabled', true);
+        regionInput.val('');
+        return;
+    }
+    
+    // 获取该省份的城市列表
+    $.get('/api/cities', { province: province }, function(response) {
+        if (response.type === 'province' && response.data) {
+            let html = '<option value="">请选择城市</option>';
+            response.data.forEach(function(city) {
+                html += `<option value="${city}">${city}</option>`;
+            });
+            citySelect.html(html).prop('disabled', false);
+        }
+    });
+});
+
+// 城市选择变化时，更新region字段
+$(document).on('change', '#project_city, #edit_city', function() {
+    const city = $(this).val();
+    const isEdit = $(this).attr('id') === 'edit_city';
+    const regionInput = isEdit ? $('#edit_region') : $('#project_region');
+    regionInput.val(city);
+});
+
+// 项目范围选项
+const SCOPE_OPTIONS = [
+    '导诊',
+    '预问诊',
+    '智能客服',
+    'AI门诊生成式病历',
+    'AI生成式入院记录',
+    'AI生成式首次病程记录',
+    'AI生成式查房记录',
+    'AI生成式手术记录',
+    'AI生成式出院小结'
+];
+
+// 初始化标签式多选
+function initScopeTags(containerId, hiddenInputId) {
+    const container = $(`#${containerId}`);
+    container.empty();
+    
+    SCOPE_OPTIONS.forEach(function(option) {
+        const tag = $(`
+            <span class="scope-tag" data-value="${option}">
+                ${option}
+            </span>
+        `);
+        
+        tag.on('click', function() {
+            $(this).toggleClass('selected');
+            updateScopeHiddenInput(hiddenInputId);
+        });
+        
+        container.append(tag);
+    });
+}
+
+// 更新隐藏输入框的值
+function updateScopeHiddenInput(hiddenInputId) {
+    const containerId = hiddenInputId.replace('_scope', '_scope_tags');
+    const selectedScopes = [];
+    $(`#${containerId} .scope-tag.selected`).each(function() {
+        selectedScopes.push($(this).data('value'));
+    });
+    $(`#${hiddenInputId}`).val(selectedScopes.join('、'));
+}
+
+// 页面加载时初始化标签
+$(document).ready(function() {
+    // 初始化项目范围标签
+    initScopeTags('project_scope_tags', 'project_scope');
+    initScopeTags('edit_project_scope_tags', 'edit_project_scope');
+    
+    // 当模态框显示时重新初始化（防止动态内容丢失）
+    $('#addProjectModal').on('show.bs.modal', function() {
+        initScopeTags('project_scope_tags', 'project_scope');
+    });
+    
+    $('#editProjectModal').on('show.bs.modal', function() {
+        initScopeTags('edit_project_scope_tags', 'edit_project_scope');
+    });
+});
+
+function loadProjects() {
+    $.get('/api/projects', function(data) {
+        if (data.length === 0) {
+            $('#projectsList').html(`
+                <div class="col-12">
+                    <div class="text-center py-5">
+                        <i class="bi bi-folder-x" style="font-size: 48px; color: #d1d1d6;"></i>
+                        <p class="text-muted mt-3 mb-0">暂无项目</p>
+                        <button type="button" class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#addProjectModal">
+                            <i class="bi bi-plus-circle"></i> 创建第一个项目
+                        </button>
+                    </div>
+                </div>
+            `);
+            return;
+        }
+        
+        // 批量获取所有项目的统计信息
+        const projectIds = data.map(p => p.id);
+        const statsPromises = projectIds.map(id => 
+            $.get(`/api/projects/${id}/stats`).then(stats => ({ id, stats }))
+        );
+        
+        Promise.all(statsPromises).then(function(statsResults) {
+            // 创建统计信息映射
+            const statsMap = {};
+            statsResults.forEach(function(result) {
+                statsMap[result.id] = result.stats;
+            });
+            
+            // 生成HTML
+            let html = '';
+            data.forEach(function(project) {
+                const stats = statsMap[project.id] || { log_count: 0, latest_log_date: null };
+                const logCount = stats.log_count || 0;
+                const latestLogDate = stats.latest_log_date || null;
+                
+                // 格式化日期显示
+                let dateDisplay = '';
+                if (latestLogDate) {
+                    const date = new Date(latestLogDate);
+                    dateDisplay = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                }
+                
+                html += `
+                    <div class="col-12 col-md-6 col-lg-4 project-card-wrapper" data-id="${project.id}">
+                        <div class="card project-card" style="height: 100%; transition: all 0.3s ease; cursor: pointer;" onclick="editProject(${project.id})">
+                            <div class="card-body" style="padding: 24px;">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div style="flex: 1;">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <h5 class="mb-0" style="font-weight: 600; color: #1d1d1f; font-size: 18px;">${escapeHtml(project.name)}</h5>
+                                        </div>
+                                        ${project.hospital_name ? `
+                                        <p class="text-muted mb-0" style="font-size: 13px; margin-top: 4px;">
+                                            <i class="bi bi-hospital"></i> ${escapeHtml(project.hospital_name)}
+                                        </p>
+                                        ` : ''}
+                                    </div>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown" onclick="event.stopPropagation();" style="padding: 4px 8px; border: none;">
+                                            <i class="bi bi-three-dots-vertical"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); event.stopPropagation(); deleteProject(${project.id}, '${project.name.replace(/'/g, "\\'")}');">
+                                                <i class="bi bi-trash"></i> 删除项目
+                                            </a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                ${project.region ? `
+                                <div class="mb-3">
+                                    <span class="badge" style="background: rgba(255, 107, 53, 0.1); color: #ff6b35; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px;">
+                                        <i class="bi bi-geo-alt"></i> ${escapeHtml(project.region)}
+                                    </span>
+                                </div>
+                                ` : ''}
+                                ${project.project_scope ? `
+                                <div class="mb-3" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                    ${project.project_scope.split('、').map(scope => scope.trim()).filter(scope => scope).map(scope => `
+                                        <span class="badge" style="background: rgba(52, 152, 219, 0.1); color: #3498db; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap;">
+                                            ${escapeHtml(scope)}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                                ` : ''}
+                                
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-3" style="border-top: 0.5px solid rgba(0, 0, 0, 0.1);">
+                                    <div>
+                                        <div style="font-size: 12px; color: #6e6e73; margin-bottom: 4px;">日志数量</div>
+                                        <div style="font-size: 18px; font-weight: 600; color: #1d1d1f;">${logCount}</div>
+                                    </div>
+                                    ${dateDisplay ? `
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 12px; color: #6e6e73; margin-bottom: 4px;">最近更新</div>
+                                        <div style="font-size: 14px; font-weight: 500; color: #1d1d1f;">${dateDisplay}</div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            $('#projectsList').html(html);
+            initProjectsSortable();
+        }).catch(function(error) {
+            console.error('加载项目统计失败:', error);
+            // 如果统计加载失败，仍然显示项目列表（不显示统计信息）
+            let html = '';
+            data.forEach(function(project) {
+                html += `
+                    <div class="col-12 col-md-6 col-lg-4 project-card-wrapper" data-id="${project.id}">
+                        <div class="card project-card" style="height: 100%; transition: all 0.3s ease; cursor: pointer;" onclick="editProject(${project.id})">
+                            <div class="card-body" style="padding: 24px;">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div style="flex: 1;">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <h5 class="mb-0" style="font-weight: 600; color: #1d1d1f; font-size: 18px;">${escapeHtml(project.name)}</h5>
+                                        </div>
+                                        ${project.hospital_name ? `
+                                        <p class="text-muted mb-0" style="font-size: 13px; margin-top: 4px;">
+                                            <i class="bi bi-hospital"></i> ${escapeHtml(project.hospital_name)}
+                                        </p>
+                                        ` : ''}
+                                    </div>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown" onclick="event.stopPropagation();" style="padding: 4px 8px; border: none;">
+                                            <i class="bi bi-three-dots-vertical"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); event.stopPropagation(); deleteProject(${project.id}, '${project.name.replace(/'/g, "\\'")}');">
+                                                <i class="bi bi-trash"></i> 删除项目
+                                            </a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                ${project.region ? `
+                                <div class="mb-3">
+                                    <span class="badge" style="background: rgba(255, 107, 53, 0.1); color: #ff6b35; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px;">
+                                        <i class="bi bi-geo-alt"></i> ${escapeHtml(project.region)}
+                                    </span>
+                                </div>
+                                ` : ''}
+                                ${project.project_scope ? `
+                                <div class="mb-3" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                    ${project.project_scope.split('、').map(scope => scope.trim()).filter(scope => scope).map(scope => `
+                                        <span class="badge" style="background: rgba(52, 152, 219, 0.1); color: #3498db; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap;">
+                                            ${escapeHtml(scope)}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            $('#projectsList').html(html);
+            initProjectsSortable();
+        });
+    });
+}
+
+// 确保加载 SortableJS 后再初始化
+function ensureSortable(thenInit) {
+    if (typeof Sortable !== 'undefined') {
+        thenInit();
+        return;
+    }
+    const existing = document.querySelector('script[data-role=\"sortablejs\"]');
+    if (existing) {
+        existing.addEventListener('load', thenInit, { once: true });
+        return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js';
+    s.async = true;
+    s.defer = true;
+    s.setAttribute('data-role', 'sortablejs');
+    s.addEventListener('load', thenInit, { once: true });
+    document.body.appendChild(s);
+}
+
+function initProjectsSortable() {
+    const container = document.getElementById('projectsList');
+    if (!container) return;
+    const STORAGE_KEY = 'order_projects_config';
+
+    function setup() {
+        function isMobileLike() {
+            return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+                   (typeof navigator !== 'undefined' && /Mobile|Android|iP(ad|hone)|Phone/i.test(navigator.userAgent)) ||
+                   (window.innerWidth && window.innerWidth < 768);
+        }
+
+        // 应用保存顺序
+        (function applySavedOrder() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+            try {
+                const ids = JSON.parse(saved);
+                const map = {};
+                Array.from(container.children).forEach(el => {
+                    const id = el.getAttribute('data-id');
+                    if (id) map[id] = el;
+                });
+                ids.forEach(id => {
+                    if (map[id]) container.appendChild(map[id]);
+                });
+            } catch (e) {
+                console.warn('[项目配置] 应用保存顺序失败', e);
+            }
+        })();
+
+        // 初始化拖拽（移动端禁用）
+        if (!isMobileLike()) {
+            new Sortable(container, {
+                animation: 150,
+                handle: '.project-card',
+                draggable: '.project-card-wrapper',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onEnd: function() {
+                    const ids = Array.from(container.children).map(el => el.getAttribute('data-id')).filter(Boolean);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+                    // 同步到后端（用户级记忆）
+                    try {
+                        $.ajax({
+                            url: '/api/project-order',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ order: ids.map(id => parseInt(id, 10)) })
+                        });
+                    } catch (e) {}
+                }
+            });
+        }
+    }
+
+    ensureSortable(setup);
+}
+
+// HTML转义函数
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+function createProject() {
+    const name = $('#project_name').val().trim();
+    if (!name) {
+        alert('请输入项目名称');
+        return;
+    }
+    
+    const region = $('#project_region').val().trim();
+    if (!region) {
+        alert('请选择地域/城市');
+        return;
+    }
+    
+    // 获取选中的项目范围（标签式多选）
+    const selectedScopes = [];
+    $('#project_scope_tags .scope-tag.selected').each(function() {
+        selectedScopes.push($(this).data('value'));
+    });
+    const projectScope = selectedScopes.length > 0 ? selectedScopes.join('、') : null;
+    
+    // 处理logo和模板上传
+    const logoFile = $('#hospital_logo')[0].files[0];
+    const templateFile = $('#report_template')[0].files[0];
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('hospital_name', $('#project_hospital_name').val().trim() || '');
+    formData.append('region', region);
+    formData.append('project_scope', projectScope || '');
+    formData.append('project_manager', $('#project_manager').val().trim() || '');
+    formData.append('dev_manager', $('#dev_manager').val().trim() || '');
+    formData.append('business_manager', $('#business_manager').val().trim() || '');
+    formData.append('project_goal', $('#project_goal').val().trim() || '');
+    formData.append('project_status', $('#project_status').val() || '');
+    if (logoFile) {
+        formData.append('hospital_logo', logoFile);
+    }
+    if (templateFile) {
+        formData.append('report_template', templateFile);
+    }
+    
+    $.ajax({
+        url: '/api/projects',
+        method: 'POST',
+        contentType: false,
+        processData: false,
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                // 检查是否从首页跳转过来
+                const urlParams = new URLSearchParams(window.location.search);
+                const fromHome = urlParams.get('from') === 'home';
+                
+                // 关闭模态框并清空表单
+                $('#addProjectModal').modal('hide');
+                $('#projectForm')[0].reset();
+                $('#project_scope_tags .scope-tag').removeClass('selected');
+                $('#project_province, #project_city').val('').trigger('change');
+                
+                if (fromHome) {
+                    // 从首页跳转过来的，创建成功后返回首页，并带上created参数
+                    alert('项目创建成功！');
+                    window.location.href = '/?created=1';
+                } else {
+                    // 在项目配置页面，刷新列表
+                    loadProjects();
+                    alert('项目创建成功！');
+                }
+            } else {
+                alert('创建失败：' + response.message);
+            }
+        },
+        error: function(xhr) {
+            const response = xhr.responseJSON;
+            alert('创建失败：' + (response?.message || '未知错误'));
+        }
+    });
+}
+
+function editProject(projectId) {
+    if (!projectId) {
+        alert('项目ID不存在');
+        return;
+    }
+    
+    // 先清空表单
+    $('#editProjectForm')[0].reset();
+    $('#edit_project_scope_tags .scope-tag').removeClass('selected');
+    $('#edit_province, #edit_city').val('').trigger('change');
+    
+    $.get('/api/projects', {}, function(projects) {
+        const project = projects.find(p => p.id === projectId);
+        if (!project) {
+            alert('项目不存在');
+            return;
+        }
+        
+        // 填充基本信息
+        $('#edit_project_id').val(project.id);
+        $('#edit_project_name').val(project.name || '');
+        $('#edit_hospital_name').val(project.hospital_name || '');
+        
+        // 设置项目范围（标签式多选）
+        $('#edit_project_scope_tags .scope-tag').removeClass('selected');
+        if (project.project_scope) {
+            const scopes = project.project_scope.split('、').map(s => s.trim()).filter(s => s);
+            scopes.forEach(function(scope) {
+                $(`#edit_project_scope_tags .scope-tag[data-value="${scope}"]`).addClass('selected');
+            });
+        }
+        
+        $('#edit_project_manager').val(project.project_manager || '');
+        $('#edit_dev_manager').val(project.dev_manager || '');
+        $('#edit_business_manager').val(project.business_manager || '');
+        $('#edit_project_goal').val(project.project_goal || '');
+        $('#edit_project_status').val(project.project_status || '');
+        
+        // 显示现有logo
+        if (project.hospital_logo) {
+            $('#edit_logo_preview').show();
+            $('#edit_logo_preview_img').attr('src', project.hospital_logo);
+        } else {
+            $('#edit_logo_preview').hide();
+        }
+        
+        // 显示现有模板
+        if (project.report_template) {
+            const templateFileName = project.report_template.split('/').pop();
+            $('#edit_template_current_file_text').text(templateFileName);
+            $('#edit_template_current_file').show();
+        } else {
+            $('#edit_template_current_file').hide();
+        }
+        $('#edit_report_template').data('remove', false);
+        
+        // 设置城市选择（二级下拉）
+        if (project.region) {
+            const region = project.region;
+            
+            // 尝试从CITIES_DATA中查找该城市所属的省份
+            $.get('/api/cities', function(response) {
+                if (response.type === 'all') {
+                    let foundProvince = '';
+                    let foundCity = '';
+                    
+                    // 遍历查找
+                    for (const [province, cities] of Object.entries(response.data)) {
+                        if (Array.isArray(cities)) {
+                            // 直辖市
+                            if (cities.includes(region)) {
+                                foundProvince = province;
+                                foundCity = region;
+                                break;
+                            }
+                        } else if (typeof cities === 'object') {
+                            // 省份
+                            for (const [city, districts] of Object.entries(cities)) {
+                                if (city === region || region.includes(city) || city.includes(region)) {
+                                    foundProvince = province;
+                                    foundCity = city;
+                                    break;
+                                }
+                            }
+                            if (foundProvince) break;
+                        }
+                    }
+                    
+                    if (foundProvince) {
+                        $('#edit_province').val(foundProvince).trigger('change');
+                        // 等待城市列表加载完成后再设置城市值
+                        setTimeout(function() {
+                            $('#edit_city').val(foundCity);
+                            $('#edit_region').val(foundCity);
+                        }, 300);
+                    } else {
+                        // 如果找不到，直接设置region值
+                        $('#edit_region').val(region);
+                    }
+                }
+            }).fail(function() {
+                // 如果城市数据加载失败，直接设置region值
+                $('#edit_region').val(region);
+            });
+        } else {
+            // 如果没有region，清空相关字段
+            $('#edit_region').val('');
+        }
+        
+        // 显示编辑模态框
+        $('#editProjectModal').modal('show');
+    }).fail(function() {
+        alert('加载项目信息失败，请刷新页面重试');
+    });
+}
+
+function saveProject() {
+    const projectId = $('#edit_project_id').val();
+    if (!projectId) {
+        alert('项目ID不存在');
+        return;
+    }
+    
+    const name = $('#edit_project_name').val().trim();
+    if (!name) {
+        alert('项目名称不能为空');
+        return;
+    }
+    
+    const region = $('#edit_region').val().trim();
+    if (!region) {
+        alert('请选择地域/城市');
+        return;
+    }
+    
+    // 获取选中的项目范围（标签式多选）
+    const selectedScopes = [];
+    $('#edit_project_scope_tags .scope-tag.selected').each(function() {
+        selectedScopes.push($(this).data('value'));
+    });
+    const projectScope = selectedScopes.length > 0 ? selectedScopes.join('、') : null;
+    
+    // 处理logo和模板上传
+    const logoFile = $('#edit_hospital_logo')[0].files[0];
+    const templateFile = $('#edit_report_template')[0].files[0];
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('hospital_name', $('#edit_hospital_name').val().trim() || '');
+    formData.append('region', region);
+    formData.append('project_scope', projectScope || '');
+    formData.append('project_manager', $('#edit_project_manager').val().trim() || '');
+    formData.append('dev_manager', $('#edit_dev_manager').val().trim() || '');
+    formData.append('business_manager', $('#edit_business_manager').val().trim() || '');
+    formData.append('project_goal', $('#edit_project_goal').val().trim() || '');
+    formData.append('project_status', $('#edit_project_status').val() || '');
+    if (logoFile) {
+        formData.append('hospital_logo', logoFile);
+    }
+    if (templateFile) {
+        formData.append('report_template', templateFile);
+    }
+    // 如果标记为移除模板
+    if ($('#edit_report_template').data('remove')) {
+        formData.append('report_template', 'removed');
+    }
+    
+    $.ajax({
+        url: `/api/projects/${projectId}`,
+        method: 'PUT',
+        contentType: false,
+        processData: false,
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                $('#editProjectModal').modal('hide');
+                // 清空表单
+                $('#editProjectForm')[0].reset();
+                $('#edit_project_scope_tags .scope-tag').removeClass('selected');
+                $('#edit_province, #edit_city').val('').trigger('change');
+                loadProjects();
+                alert('保存成功！');
+            } else {
+                alert('保存失败：' + response.message);
+            }
+        },
+        error: function(xhr) {
+            const response = xhr.responseJSON;
+            alert('保存失败：' + (response?.message || '未知错误'));
+        }
+    });
+}
+
+function deleteProject(projectId, projectName) {
+    if (!confirm(`确定要删除项目"${projectName}"吗？\n注意：删除项目将同时删除该项目下的所有日志记录！`)) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/projects/${projectId}`,
+        method: 'DELETE',
+        success: function(response) {
+            if (response.success) {
+                loadProjects();
+                alert('删除成功！');
+            } else {
+                alert('删除失败：' + response.message);
+            }
+        },
+        error: function(xhr) {
+            alert('删除失败');
+        }
+    });
+}
+
+// 根据医院名称自动匹配 省/市（调用后端高德定位接口，禁止模糊匹配）
+function autoMatchRegionFromProjectName(projectName, isEdit) {
+    const provinceSelect = isEdit ? $('#edit_province') : $('#project_province');
+    const citySelect = isEdit ? $('#edit_city') : $('#project_city');
+    const regionInput = isEdit ? $('#edit_region') : $('#project_region');
+    const hospitalInput = isEdit ? $('#edit_hospital_name') : $('#project_hospital_name');
+
+    // 仅使用医院名称进行定位；若为空则不发起请求
+    if (!hospitalInput.val() && projectName) {
+        // 可选：若未填医院名，自动填充一次以减少输入
+        hospitalInput.val(projectName);
+    }
+    const hospital = (hospitalInput.val() || '').trim();
+    if (!hospital) {
+        console.warn('[项目配置][医院定位] 医院名称为空，跳过定位');
+        return;
+    }
+
+    // 调用后端医院定位接口（基于高德），返回省、市等精确信息
+    $.get('/api/hospital/location', {
+        hospital_name: hospital
+    }, function(resp) {
+        console.log('[项目配置][医院定位] 请求成功:', resp);
+        if (resp && resp.success && resp.data) {
+            const province = resp.data.province || resp.data.region || '';
+            const city = resp.data.city || '';
+            console.log('[项目配置][医院定位] 命中:', province, city, resp.data.formatted_address || '');
+            if (province) {
+                provinceSelect.val(province).trigger('change');
+                setTimeout(function() {
+                    if (city) {
+                        citySelect.val(city);
+                        regionInput.val(city);
+                    }
+                }, 250);
+            }
+        } else {
+            console.warn('[项目配置][医院定位] 未命中，保持当前选择');
+        }
+    }).fail(function(err){
+        console.error('[项目配置][医院定位] 请求失败:', err);
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}注册 - Fusion-AI日志记录系统{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: calc(100vh - 200px);">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4 class="mb-0" id="registerTitle">
+                    <i class="bi bi-person-plus"></i> 注册账号
+                </h4>
+            </div>
+            <div class="card-body">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" action="{{ url_for('register') }}" id="registerForm">
+                    <input type="hidden" id="mac_address" name="mac_address">
+                    <input type="hidden" id="is_add_device" name="is_add_device" value="0">
+                    
+                    <div id="newUserForm">
+                        <div class="mb-3">
+                            <label for="real_name" class="form-label">真实姓名 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="real_name" name="real_name" autofocus placeholder="请输入您的真实姓名">
+                            <small class="text-muted">系统将自动识别您的设备</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="multi_device_token" class="form-label">多设备登录口令 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="multi_device_token" name="multi_device_token" placeholder="设置一个口令，用于在其他设备登录">
+                            <small class="text-muted">请妥善保管，在其他设备登录时需要此口令</small>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>提示：</strong>系统将自动识别您的设备MAC地址作为身份标识。如需在其他设备登录，请使用您设置的多设备登录口令。
+                        </div>
+                    </div>
+                    
+                    <div id="addDeviceForm" style="display: none;">
+                        <div class="mb-3">
+                            <label for="add_real_name" class="form-label">真实姓名 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="add_real_name" autofocus placeholder="请输入您的真实姓名">
+                            <small class="text-muted">请输入已注册账号的真实姓名</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="add_multi_device_token" class="form-label">多设备登录口令 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="add_multi_device_token" placeholder="请输入多设备登录口令">
+                            <small class="text-muted">请输入您在首次注册时设置的多设备登录口令</small>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> 
+                            <strong>添加新设备：</strong>系统将把当前设备添加到您的账号中，之后可以直接登录。
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="bi bi-person-plus"></i> 注册
+                        </button>
+                    </div>
+                </form>
+                
+                <script>
+                // 获取MAC地址（通过WebRTC或其他方式）
+                // 注意：由于浏览器安全限制，无法直接获取MAC地址
+                // 这里使用设备指纹作为替代方案
+                function getDeviceFingerprint() {
+                    // 尝试多种方式获取设备唯一标识
+                    let fingerprint = '';
+                    
+                    // 1. 尝试从localStorage获取已存储的MAC
+                    if (localStorage.getItem('device_mac')) {
+                        return localStorage.getItem('device_mac');
+                    }
+                    
+                    // 2. 生成设备指纹（基于浏览器特征）
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.textBaseline = 'top';
+                    ctx.font = '14px Arial';
+                    ctx.fillText('Device fingerprint', 2, 2);
+                    
+                    fingerprint = canvas.toDataURL();
+                    
+                    // 3. 组合多个特征
+                    const features = [
+                        navigator.userAgent,
+                        navigator.language,
+                        screen.width + 'x' + screen.height,
+                        new Date().getTimezoneOffset(),
+                        fingerprint
+                    ].join('|');
+                    
+                    // 4. 生成简单的哈希值作为MAC地址替代
+                    let hash = 0;
+                    for (let i = 0; i < features.length; i++) {
+                        const char = features.charCodeAt(i);
+                        hash = ((hash << 5) - hash) + char;
+                        hash = hash & hash; // Convert to 32bit integer
+                    }
+                    
+                    // 格式化为类似MAC地址的格式
+                    const mac = Math.abs(hash).toString(16).padStart(12, '0');
+                    const formattedMac = mac.match(/.{1,2}/g).join(':');
+                    
+                    // 存储到localStorage
+                    localStorage.setItem('device_mac', formattedMac);
+                    
+                    return formattedMac;
+                }
+                
+                // 页面加载时获取MAC地址
+                document.addEventListener('DOMContentLoaded', function() {
+                    const mac = getDeviceFingerprint();
+                    document.getElementById('mac_address').value = mac;
+                    console.log('设备标识:', mac);
+                    
+                    // 检查是否是添加设备模式
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const isAddDevice = urlParams.get('add_device') === '1';
+                    
+                    if (isAddDevice) {
+                        // 显示添加设备表单
+                        document.getElementById('newUserForm').style.display = 'none';
+                        document.getElementById('addDeviceForm').style.display = 'block';
+                        document.getElementById('is_add_device').value = '1';
+                        document.getElementById('registerTitle').innerHTML = '<i class="bi bi-device-hdd"></i> 添加新设备';
+                        document.getElementById('submitBtn').innerHTML = '<i class="bi bi-device-hdd"></i> 添加设备';
+                        
+                        // 禁用并移除主表单字段的 name 属性，避免验证和提交冲突
+                        const mainRealName = document.getElementById('real_name');
+                        const mainToken = document.getElementById('multi_device_token');
+                        mainRealName.disabled = true;
+                        mainToken.disabled = true;
+                        mainRealName.removeAttribute('name');
+                        mainToken.removeAttribute('name');
+                        
+                        // 确保添加设备表单字段启用并设置 name 属性
+                        const addRealName = document.getElementById('add_real_name');
+                        const addToken = document.getElementById('add_multi_device_token');
+                        addRealName.disabled = false;
+                        addToken.disabled = false;
+                        addRealName.setAttribute('name', 'real_name');
+                        addToken.setAttribute('name', 'multi_device_token');
+                    } else {
+                        // 确保主表单字段启用并有 name 属性
+                        const mainRealName = document.getElementById('real_name');
+                        const mainToken = document.getElementById('multi_device_token');
+                        mainRealName.disabled = false;
+                        mainToken.disabled = false;
+                        mainRealName.setAttribute('name', 'real_name');
+                        mainToken.setAttribute('name', 'multi_device_token');
+                        
+                        // 确保添加设备表单字段禁用且没有 name 属性（它们默认就没有 name）
+                        const addRealName = document.getElementById('add_real_name');
+                        const addToken = document.getElementById('add_multi_device_token');
+                        addRealName.disabled = true;
+                        addToken.disabled = true;
+                        // 确保移除 name 属性（如果存在）
+                        addRealName.removeAttribute('name');
+                        addToken.removeAttribute('name');
+                    }
+
+                    // 表单提交处理
+                    const form = document.getElementById('registerForm');
+                    form.addEventListener('submit', function(e) {
+                        // 确保MAC地址已设置
+                        const currentMac = document.getElementById('mac_address').value;
+                        if (!currentMac) {
+                            document.getElementById('mac_address').value = getDeviceFingerprint();
+                        }
+                        
+                        // 根据当前显示的表单，验证必填字段
+                        const isAddDevice = document.getElementById('is_add_device').value === '1';
+                        
+                        // 提交前确保隐藏字段被禁用，避免浏览器验证
+                        if (isAddDevice) {
+                            // 添加设备模式：禁用主表单字段
+                            document.getElementById('real_name').disabled = true;
+                            document.getElementById('multi_device_token').disabled = true;
+                            // 确保添加设备表单字段启用
+                            document.getElementById('add_real_name').disabled = false;
+                            document.getElementById('add_multi_device_token').disabled = false;
+                        } else {
+                            // 新用户注册模式：禁用添加设备表单字段
+                            document.getElementById('add_real_name').disabled = true;
+                            document.getElementById('add_multi_device_token').disabled = true;
+                            // 确保主表单字段启用
+                            document.getElementById('real_name').disabled = false;
+                            document.getElementById('multi_device_token').disabled = false;
+                        }
+                        
+                        // 进行 JavaScript 验证
+                        let isValid = true;
+                        let errorMessage = '';
+                        let focusElement = null;
+                        
+                        if (isAddDevice) {
+                            // 添加设备模式：验证添加设备表单字段
+                            const addRealName = document.getElementById('add_real_name').value.trim();
+                            const addToken = document.getElementById('add_multi_device_token').value.trim();
+                            
+                            if (!addRealName) {
+                                isValid = false;
+                                errorMessage = '请输入真实姓名';
+                                focusElement = document.getElementById('add_real_name');
+                            } else if (!addToken) {
+                                isValid = false;
+                                errorMessage = '请输入多设备登录口令';
+                                focusElement = document.getElementById('add_multi_device_token');
+                            }
+                        } else {
+                            // 新用户注册模式：验证新用户表单字段
+                            const realName = document.getElementById('real_name').value.trim();
+                            const token = document.getElementById('multi_device_token').value.trim();
+                            
+                            if (!realName) {
+                                isValid = false;
+                                errorMessage = '请输入真实姓名';
+                                focusElement = document.getElementById('real_name');
+                            } else if (!token) {
+                                isValid = false;
+                                errorMessage = '请设置多设备登录口令';
+                                focusElement = document.getElementById('multi_device_token');
+                            }
+                        }
+                        
+                        // 如果验证失败，阻止提交并显示错误
+                        if (!isValid) {
+                            e.preventDefault();
+                            alert(errorMessage);
+                            if (focusElement) {
+                                focusElement.focus();
+                            }
+                            return false;
+                        }
+                        
+                        // 验证通过，显示加载状态并允许提交
+                        const submitBtn = document.getElementById('submitBtn');
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>提交中...';
+                        
+                        console.log('表单提交:', {
+                            mac_address: document.getElementById('mac_address').value,
+                            is_add_device: document.getElementById('is_add_device').value,
+                            real_name: isAddDevice ? document.getElementById('add_real_name').value : document.getElementById('real_name').value
+                        });
+                        
+                        // 不调用 preventDefault()，允许表单正常提交
+                    });
+                });
+                </script>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <p class="text-muted mb-0">已有账号？</p>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary mt-2">
+                        <i class="bi bi-box-arrow-in-right"></i> 立即登录
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}周报生成 - 日志记录系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-file-earmark-text"></i> 周报生成
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 系统将在每周六9:00自动生成上一周的周报。您也可以随时手动生成预览周报。
+                </div>
+
+                <form id="reportForm">
+                    <div class="mb-3">
+                        <label for="report_project" class="form-label">项目名称 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="report_project" name="project_id" required>
+                            <option value="">请选择项目</option>
+                            {% for project in projects %}
+                            <option value="{{ project.id }}">{{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="report_week" class="form-label">周范围 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="report_week" name="week_start" required>
+                            <option value="">请先选择项目</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">输出格式</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="format" id="format_word" value="word" checked>
+                                <label class="form-check-label" for="format_word">
+                                    Word (.docx)
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="format" id="format_pdf" value="pdf">
+                                <label class="form-check-label" for="format_pdf">
+                                    PDF (.pdf)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-file-earmark-arrow-down"></i> 生成并下载周报
+                        </button>
+                    </div>
+                </form>
+
+                <hr>
+
+                <div id="reportStatus" class="mt-3"></div>
+            </div>
+        </div>
+
+        
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 项目选择变化时加载周列表
+    $('#report_project').on('change', function() {
+        const projectId = $(this).val();
+        if (projectId) {
+            loadWeeks(projectId);
+        } else {
+            $('#report_week').html('<option value="">请先选择项目</option>');
+        }
+    });
+    
+    $('#reportForm').on('submit', function(e) {
+        e.preventDefault();
+        generateReport();
+    });
+});
+
+function loadWeeks(projectId) {
+    $('#reportStatus').html('<div class="spinner-border spinner-border-sm" role="status"></div> 加载中...');
+    
+    $.get('/api/weeks', { project_id: projectId }, function(data) {
+        if (data.length === 0) {
+            $('#report_week').html('<option value="">该项目暂无日志记录</option>');
+            $('#reportStatus').html('<div class="alert alert-warning">该项目暂无日志记录，无法生成周报</div>');
+            return;
+        }
+        
+        let html = '<option value="">请选择周范围</option>';
+        data.forEach(function(week) {
+            html += `<option value="${week.week_start}">${week.display}</option>`;
+        });
+        $('#report_week').html(html);
+        $('#reportStatus').html('');
+    }).fail(function() {
+        $('#reportStatus').html('<div class="alert alert-danger">加载周列表失败</div>');
+    });
+}
+
+function generateReport() {
+    const projectId = $('#report_project').val();
+    const weekStart = $('#report_week').val();
+    const format = $('input[name="format"]:checked').val();
+    
+    if (!projectId || !weekStart) {
+        alert('请选择项目和周范围');
+        return;
+    }
+    
+    $('#reportStatus').html('<div class="alert alert-info"><div class="spinner-border spinner-border-sm me-2" role="status"></div>正在生成周报，请稍候...</div>');
+    
+    $.ajax({
+        url: '/api/report/generate',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            project_id: parseInt(projectId),
+            week_start: weekStart,
+            format: format
+        }),
+        success: function(response) {
+            if (response.success) {
+                // 下载文件
+                const downloadUrl = `/api/report/download/${response.filename}`;
+                window.location.href = downloadUrl;
+                
+                $('#reportStatus').html(`<div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> 周报生成成功！文件已开始下载。
+                    <br><small>文件名：${response.filename}</small>
+                </div>`);
+            } else {
+                $('#reportStatus').html(`<div class="alert alert-danger">生成失败：${response.message}</div>`);
+            }
+        },
+        error: function(xhr) {
+            const response = xhr.responseJSON;
+            $('#reportStatus').html(`<div class="alert alert-danger">生成失败：${response?.message || '未知错误'}</div>`);
+        }
+    });
+}
+</script>
+{% endblock %}
+

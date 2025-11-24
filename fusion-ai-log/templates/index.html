@@ -1,0 +1,623 @@
+{% extends "base.html" %}
+
+{% block title %}Fusion-AI内部日志记录系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 col-lg-10 offset-lg-1">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-journal-text"></i> 实施日志
+            </div>
+            <div class="card-body">
+                <form id="logForm">
+                    <!-- 日期 -->
+                    <div class="mb-3">
+                        <label for="date" class="form-label">日期 <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="date" name="date" value="{{ today }}" required>
+                    </div>
+
+                    <!-- 项目名称 - 如果从项目中心带入则隐藏 -->
+                    {% if selected_project %}
+                    <input type="hidden" id="project_id" name="project_id" value="{{ selected_project.id }}" required>
+                    {% else %}
+                    <div class="mb-3">
+                        <label for="project_id" class="form-label">项目名称 <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <select class="form-select" id="project_id" name="project_id" required>
+                                <option value="">请选择项目</option>
+                                {% for project in projects %}
+                                <option value="{{ project.id }}">{{ project.name }}{% if project.hospital_name %} - {{ project.hospital_name }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <a href="/projects?from=home" class="btn btn-outline-primary">
+                                <i class="bi bi-plus"></i> 新增项目
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 项目经理 - 隐藏 -->
+                    <div class="mb-3" style="display: none;">
+                        <label for="project_manager" class="form-label">项目经理</label>
+                        <input type="text" class="form-control" id="project_manager" name="project_manager" readonly>
+                    </div>
+
+                    <!-- 研发经理 - 隐藏 -->
+                    <div class="mb-3" style="display: none;">
+                        <label for="dev_manager" class="form-label">研发经理</label>
+                        <input type="text" class="form-control" id="dev_manager" name="dev_manager" readonly>
+                    </div>
+
+                    <!-- 任务分类 -->
+                    <div class="mb-3">
+                        <label for="task_category_id" class="form-label">任务分类 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="task_category_id" name="task_category_id" required>
+                            <option value="">请选择任务分类</option>
+                            {% for category in task_categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- 项目状态 - 隐藏 -->
+                    <div class="mb-3" style="display: none;">
+                        <label for="project_status" class="form-label">项目状态</label>
+                        <input type="text" class="form-control" id="project_status" name="project_status" readonly>
+                    </div>
+
+                    <!-- 今日处理问题 -->
+                    <div class="mb-3">
+                        <label for="content" class="form-label">今日处理问题 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="content" name="content" rows="5" placeholder="请输入今日处理的问题..." required></textarea>
+                    </div>
+
+                    <!-- 下一步计划 -->
+                    <div class="mb-3">
+                        <label for="next_plan" class="form-label">下一步计划</label>
+                        <textarea class="form-control" id="next_plan" name="next_plan" rows="3" placeholder="请输入下一步计划..."></textarea>
+                    </div>
+
+                    <!-- 是否需要支持 -->
+                    <div class="mb-3">
+                        <label class="form-label">是否需要支持</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="need_support" id="need_support_no" value="no" checked>
+                                <label class="form-check-label" for="need_support_no">否</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="need_support" id="need_support_yes" value="yes">
+                                <label class="form-check-label" for="need_support_yes">是</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 支持字段组（默认隐藏） -->
+                    <div id="supportFieldsGroup" style="display: none;">
+                        <!-- 需要产品支持 -->
+                        <div class="mb-3">
+                            <label for="need_product_support" class="form-label">需要产品支持</label>
+                            <input type="text" class="form-control" id="need_product_support" name="need_product_support" value="无" placeholder="无">
+                        </div>
+
+                        <!-- 需要研发支持 -->
+                        <div class="mb-3">
+                            <label for="need_dev_support" class="form-label">需要研发支持</label>
+                            <input type="text" class="form-control" id="need_dev_support" name="need_dev_support" value="无" placeholder="无">
+                        </div>
+
+                        <!-- 需要测试支持 -->
+                        <div class="mb-3">
+                            <label for="need_test_support" class="form-label">需要测试支持</label>
+                            <input type="text" class="form-control" id="need_test_support" name="need_test_support" value="无" placeholder="无">
+                        </div>
+
+                        <!-- 需要商务支持 -->
+                        <div class="mb-3">
+                            <label for="need_business_support" class="form-label">需要商务支持</label>
+                            <input type="text" class="form-control" id="need_business_support" name="need_business_support" value="无" placeholder="无">
+                        </div>
+
+                        <!-- 需要客户支持 -->
+                        <div class="mb-3">
+                            <label for="need_customer_support" class="form-label">需要客户支持</label>
+                            <input type="text" class="form-control" id="need_customer_support" name="need_customer_support" value="无" placeholder="无">
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-circle"></i> 提交
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- 日志预览区域 -->
+                <div id="logPreview" class="mt-4" style="display: none;">
+                    <hr>
+                    <div class="card" style="background: rgba(255, 255, 255, 0.95);">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-eye"></i> 日志预览</h5>
+                            <button class="btn btn-sm btn-outline-primary" onclick="copyPreview(event)">
+                                <i class="bi bi-clipboard"></i> 复制
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <pre id="previewContent" style="white-space: pre-wrap; word-wrap: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.6; margin: 0; padding: 0; background: transparent; border: none;"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增项目模态框 -->
+<div class="modal fade" id="addProjectModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">新增项目</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="projectForm">
+                    <div class="mb-3">
+                        <label for="project_name" class="form-label">项目名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="project_name" name="name" required placeholder="例如：北京高博医院">
+                        <small class="text-muted">提示：项目名称一般以医院名称命名</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="project_hospital_name" class="form-label">医院名称</label>
+                        <input type="text" class="form-control" id="project_hospital_name" name="hospital_name" placeholder="用于IP定位匹配">
+                    </div>
+                    <div class="mb-3">
+                        <label for="project_region" class="form-label">地域/城市</label>
+                        <input type="text" class="form-control" id="project_region" name="region" placeholder="例如：北京、上海">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="project_manager_input" class="form-label">项目经理</label>
+                                <input type="text" class="form-control" id="project_manager_input" name="project_manager">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="dev_manager_input" class="form-label">研发经理</label>
+                                <input type="text" class="form-control" id="dev_manager_input" name="dev_manager">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="business_manager_input" class="form-label">商务经理</label>
+                                <input type="text" class="form-control" id="business_manager_input" name="business_manager">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="createProject()">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 由后端传入的“今日已存在的日志”，若无则为 null
+const EXISTING_LOG = {{ (existing_log.to_dict() if existing_log else None) | tojson }};
+let allProjects = [];
+let selectedProject = null;
+
+$(document).ready(function() {
+    {% if selected_project %}
+    // 如果从项目中心带入项目，直接设置项目信息
+    selectedProject = {
+        id: {{ selected_project.id }},
+        name: {{ selected_project.name|tojson }},
+        project_manager: {{ (selected_project.project_manager or "")|tojson }},
+        dev_manager: {{ (selected_project.dev_manager or "")|tojson }},
+        hospital_name: {{ (selected_project.hospital_name or "")|tojson }}
+    };
+    updateProjectInfo(selectedProject);
+    {% else %}
+    // 如果没有指定项目，加载所有项目列表（不进行IP匹配）
+    loadProjects();
+    {% endif %}
+    
+    // 是否需要支持切换
+    $('input[name="need_support"]').on('change', function() {
+        const needSupport = $(this).val() === 'yes';
+        if (needSupport) {
+            $('#supportFieldsGroup').slideDown(300);
+        } else {
+            $('#supportFieldsGroup').slideUp(300);
+            // 重置支持字段为"无"
+            $('#need_product_support, #need_dev_support, #need_test_support, #need_business_support, #need_customer_support').val('无');
+        }
+    });
+    
+    // 项目选择变化
+    $('#project_id').on('change', function() {
+        const projectId = $(this).val();
+        if (projectId) {
+            selectedProject = allProjects.find(p => p.id == projectId);
+            if (selectedProject) {
+                updateProjectInfo(selectedProject);
+            }
+        } else {
+            clearProjectInfo();
+        }
+    });
+    
+    // 任务分类变化，更新项目状态
+    $('#task_category_id').on('change', function() {
+        const categoryText = $(this).find('option:selected').text();
+        if (categoryText && categoryText !== '请选择任务分类') {
+            $('#project_status').val(categoryText);
+        }
+    });
+    
+    // 如果存在今日日志，自动切换为编辑模式并填充
+    if (EXISTING_LOG) {
+        try {
+            $('#date').val(EXISTING_LOG.date);
+            if ($('#project_id').length) {
+                $('#project_id').val(String(EXISTING_LOG.project_id));
+            }
+            $('#task_category_id').val(String(EXISTING_LOG.task_category_id));
+            $('#content').val(EXISTING_LOG.content || '');
+            $('#next_plan').val(EXISTING_LOG.next_plan || '');
+            const needSupport = (EXISTING_LOG.need_product_support && EXISTING_LOG.need_product_support !== '无') ||
+                                (EXISTING_LOG.need_dev_support && EXISTING_LOG.need_dev_support !== '无') ||
+                                (EXISTING_LOG.need_test_support && EXISTING_LOG.need_test_support !== '无') ||
+                                (EXISTING_LOG.need_business_support && EXISTING_LOG.need_business_support !== '无') ||
+                                (EXISTING_LOG.need_customer_support && EXISTING_LOG.need_customer_support !== '无');
+            if (needSupport) {
+                $('#need_support_yes').prop('checked', true);
+                $('#supportFieldsGroup').show();
+            } else {
+                $('#need_support_no').prop('checked', true);
+                $('#supportFieldsGroup').hide();
+            }
+            $('#need_product_support').val(EXISTING_LOG.need_product_support || '无');
+            $('#need_dev_support').val(EXISTING_LOG.need_dev_support || '无');
+            $('#need_test_support').val(EXISTING_LOG.need_test_support || '无');
+            $('#need_business_support').val(EXISTING_LOG.need_business_support || '无');
+            $('#need_customer_support').val(EXISTING_LOG.need_customer_support || '无');
+            // 修改提交按钮
+            $('#logForm button[type=\"submit\"]').html('<i class=\"bi bi-save\"></i> 更新今日日志');
+            // 覆盖提交逻辑为更新
+            $('#logForm').off('submit.create');
+            $('#logForm').off('submit.update');
+            $('#logForm').on('submit.update', function(e) {
+                e.preventDefault();
+                e.stopImmediatePropagation(); // 阻止其他处理器执行
+                const formData = {
+                    project_id: parseInt($('#project_id').val()),
+                    date: $('#date').val(),
+                    task_category_id: parseInt($('#task_category_id').val()),
+                    content: $('#content').val().trim(),
+                    project_status: $('#project_status').val() || null,
+                    need_product_support: $('input[name=\"need_support\"]:checked').val() === 'yes' ? ($('#need_product_support').val().trim() || '无') : '无',
+                    need_dev_support: $('input[name=\"need_support\"]:checked').val() === 'yes' ? ($('#need_dev_support').val().trim() || '无') : '无',
+                    need_test_support: $('input[name=\"need_support\"]:checked').val() === 'yes' ? ($('#need_test_support').val().trim() || '无') : '无',
+                    need_business_support: $('input[name=\"need_support\"]:checked').val() === 'yes' ? ($('#need_business_support').val().trim() || '无') : '无',
+                    need_customer_support: $('input[name=\"need_support\"]:checked').val() === 'yes' ? ($('#need_customer_support').val().trim() || '无') : '无',
+                    next_plan: $('#next_plan').val().trim() || null
+                };
+                $.ajax({
+                    url: `/api/logs/${EXISTING_LOG.id}`,
+                    method: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function(response) {
+                        if (response.success) {
+                            alert('已更新今日日志');
+                        } else {
+                            alert('更新失败：' + (response.message || '未知错误'));
+                        }
+                    },
+                    error: function(xhr) {
+                        const response = xhr.responseJSON;
+                        alert('更新失败：' + (response?.message || '未知错误'));
+                    }
+                });
+            });
+        } catch (e) {
+            console.warn('加载今日日志失败', e);
+        }
+    }
+
+    // 表单提交（默认创建；若EXISTING_LOG存在，上面会覆盖为更新逻辑）
+    $('#logForm').on('submit.create', function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            project_id: parseInt($('#project_id').val()),
+            date: $('#date').val(),
+            task_category_id: parseInt($('#task_category_id').val()),
+            content: $('#content').val().trim(),
+            project_status: $('#project_status').val() || null,
+            need_product_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_product_support').val().trim() || '无') : '无',
+            need_dev_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_dev_support').val().trim() || '无') : '无',
+            need_test_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_test_support').val().trim() || '无') : '无',
+            need_business_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_business_support').val().trim() || '无') : '无',
+            need_customer_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_customer_support').val().trim() || '无') : '无',
+            next_plan: $('#next_plan').val().trim() || null
+        };
+        
+        // 保存formData到全局变量，供预览使用
+        window.lastFormData = formData;
+        
+        if (!formData.content) {
+            alert('请输入今日处理问题');
+            return;
+        }
+        
+        $.ajax({
+            url: '/api/logs',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                if (response.success) {
+                    // 提示提交成功
+                    alert('提交成功！');
+                    
+                    // 获取创建的日志ID
+                    const logId = response.data?.id;
+                    if (logId) {
+                        // 修改提交按钮为更新按钮
+                        $('#logForm button[type="submit"]').html('<i class="bi bi-save"></i> 更新今日日志');
+                        
+                        // 移除所有提交事件监听器（使用命名空间确保移除干净）
+                        $('#logForm').off('submit.create');
+                        $('#logForm').off('submit.update');
+                        
+                        // 绑定更新逻辑（使用命名空间）
+                        $('#logForm').on('submit.update', function(e) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation(); // 阻止其他处理器执行
+                            
+                            const updateFormData = {
+                                project_id: parseInt($('#project_id').val()),
+                                date: $('#date').val(),
+                                task_category_id: parseInt($('#task_category_id').val()),
+                                content: $('#content').val().trim(),
+                                project_status: $('#project_status').val() || null,
+                                need_product_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_product_support').val().trim() || '无') : '无',
+                                need_dev_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_dev_support').val().trim() || '无') : '无',
+                                need_test_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_test_support').val().trim() || '无') : '无',
+                                need_business_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_business_support').val().trim() || '无') : '无',
+                                need_customer_support: $('input[name="need_support"]:checked').val() === 'yes' ? ($('#need_customer_support').val().trim() || '无') : '无',
+                                next_plan: $('#next_plan').val().trim() || null
+                            };
+                            
+                            if (!updateFormData.content) {
+                                alert('请输入今日处理问题');
+                                return;
+                            }
+                            
+                            $.ajax({
+                                url: `/api/logs/${logId}`,
+                                method: 'PUT',
+                                contentType: 'application/json',
+                                data: JSON.stringify(updateFormData),
+                                success: function(updateResponse) {
+                                    if (updateResponse.success) {
+                                        alert('已更新今日日志');
+                                    } else {
+                                        alert('更新失败：' + (updateResponse.message || '未知错误'));
+                                    }
+                                },
+                                error: function(xhr) {
+                                    const response = xhr.responseJSON;
+                                    alert('更新失败：' + (response?.message || '未知错误'));
+                                }
+                            });
+                        });
+                    }
+                    
+                    // 不重置表单，保持用户填写的内容
+                } else {
+                    // 如果今日已存在日志，提示并刷新为编辑模式
+                    if (response.conflict && response.data) {
+                        // 直接刷新，让后端existing_log渲染编辑模式
+                        window.location.reload();
+                        return;
+                    }
+                    alert('提交失败：' + response.message);
+                }
+            },
+            error: function(xhr) {
+                const response = xhr.responseJSON;
+                alert('提交失败：' + (response?.message || '未知错误'));
+            }
+        });
+    });
+});
+
+function loadProjects() {
+    // 直接加载所有项目（不进行IP匹配，提高速度）
+    $.get('/api/projects', function(projects) {
+        allProjects = projects || [];
+        let html = '<option value="">请选择项目</option>';
+        allProjects.forEach(function(project) {
+            html += `<option value="${project.id}">${project.name}${project.hospital_name ? ' - ' + project.hospital_name : ''}</option>`;
+        });
+        $('#project_id').html(html);
+    }).fail(function(xhr) {
+        console.error('加载项目失败:', xhr);
+    });
+}
+
+function updateProjectInfo(project) {
+    $('#project_manager').val(project.project_manager || '');
+    $('#dev_manager').val(project.dev_manager || '');
+}
+
+function clearProjectInfo() {
+    $('#project_manager').val('');
+    $('#dev_manager').val('');
+    $('#project_status').val('');
+}
+
+function generatePreview(formData, logData) {
+    // 获取项目信息
+    const project = selectedProject || allProjects.find(p => p.id == formData.project_id);
+    const projectName = project ? project.name : '';
+    const projectManager = project ? (project.project_manager || '') : '';
+    const devManager = project ? (project.dev_manager || '') : '';
+    
+    // 获取任务分类名称
+    const taskCategory = $('#task_category_id option:selected').text();
+    const projectStatus = formData.project_status || taskCategory || '';
+    
+    // 格式化日期
+    const date = new Date(formData.date);
+    const dateStr = date.getFullYear() + '年' + 
+                   String(date.getMonth() + 1).padStart(2, '0') + '月' + 
+                   String(date.getDate()).padStart(2, '0') + '日';
+    
+    // 生成预览内容
+    let preview = `【${dateStr}】实施日志\n`;
+    preview += `项目名称：${projectName}\n`;
+    if (projectManager) {
+        preview += `项目经理：${projectManager}\n`;
+    }
+    if (devManager) {
+        preview += `研发经理：${devManager}\n`;
+    }
+    if (projectStatus) {
+        preview += `项目状态：${projectStatus}\n`;
+    }
+    preview += `今日处理问题：\n${formData.content}\n\n`;
+    
+    // 支持需求（即使为"无"也显示）
+    // 只有选择了"是"才显示支持字段
+    const needSupport = formData.need_product_support && formData.need_product_support !== '无' ||
+                       formData.need_dev_support && formData.need_dev_support !== '无' ||
+                       formData.need_test_support && formData.need_test_support !== '无' ||
+                       formData.need_business_support && formData.need_business_support !== '无' ||
+                       formData.need_customer_support && formData.need_customer_support !== '无';
+    
+    if (needSupport) {
+        preview += '需要产品支持：' + (formData.need_product_support || '无') + '\n';
+        preview += '需要研发支持：' + (formData.need_dev_support || '无') + '\n';
+        preview += '需要测试支持：' + (formData.need_test_support || '无') + '\n';
+        preview += '需要商务支持：' + (formData.need_business_support || '无') + '\n';
+        preview += '需要客户支持：' + (formData.need_customer_support || '无') + '\n\n';
+    }
+    
+    // 下一步计划
+    if (formData.next_plan && formData.next_plan.trim()) {
+        preview += `下一步计划：\n${formData.next_plan}`;
+    }
+    
+    // 显示预览
+    $('#previewContent').text(preview);
+}
+
+function copyPreview(event) {
+    const previewText = $('#previewContent').text();
+    const btn = event ? event.target.closest('button') : document.querySelector('#logPreview button');
+    
+    // 使用现代 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(previewText).then(function() {
+            // 显示成功提示
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check"></i> 已复制';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-success');
+            
+            setTimeout(function() {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+            }, 2000);
+        }).catch(function(err) {
+            console.error('复制失败:', err);
+            fallbackCopy(previewText, btn);
+        });
+    } else {
+        // 降级方案
+        fallbackCopy(previewText, btn);
+    }
+}
+
+function fallbackCopy(text, btn) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check"></i> 已复制';
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-success');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    } catch (err) {
+        alert('复制失败，请手动选择文本复制');
+    }
+    
+    document.body.removeChild(textarea);
+}
+
+function createProject() {
+    const name = $('#project_name').val().trim();
+    if (!name) {
+        alert('请输入项目名称');
+        return;
+    }
+    
+    const projectData = {
+        name: name,
+        hospital_name: $('#project_hospital_name').val().trim() || null,
+        region: $('#project_region').val().trim() || null,
+        project_manager: $('#project_manager_input').val().trim() || null,
+        dev_manager: $('#dev_manager_input').val().trim() || null,
+        business_manager: $('#business_manager_input').val().trim() || null
+    };
+    
+    $.ajax({
+        url: '/api/projects',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(projectData),
+        success: function(response) {
+            if (response.success) {
+                // 重新加载项目列表
+                loadProjects();
+                
+                // 关闭模态框
+                $('#addProjectModal').modal('hide');
+                $('#projectForm')[0].reset();
+                alert('项目创建成功！');
+            } else {
+                alert('创建失败：' + response.message);
+            }
+        },
+        error: function(xhr) {
+            const response = xhr.responseJSON;
+            alert('创建失败：' + (response?.message || '未知错误'));
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1299 @@
+{% extends "base.html" %}
+
+{% block title %}日志中心 - Fusion-AI日志记录系统{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 页面标题 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0" style="font-weight: 600; color: #1d1d1f;">
+                        <i class="bi bi-journal-text"></i> 日志中心
+                    </h4>
+                    <p class="text-muted mb-0" style="font-size: 14px; margin-top: 4px;">查看和管理您的工作日志</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目卡片视图 -->
+    <div id="projectsView">
+        <div class="row g-4" id="projectsList">
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目日志周视图 -->
+    <div id="logsView" style="display: none;">
+        <!-- 项目信息头部 -->
+        <div class="card mb-4" style="background: linear-gradient(135deg, rgba(255, 107, 53, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%);">
+            <div class="card-body" style="padding: 20px 24px;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div style="flex: 1;">
+                        <button class="btn btn-outline-secondary btn-sm mb-2" onclick="backToProjects()" style="border-radius: 8px; padding: 6px 14px; font-size: 13px;">
+                            <i class="bi bi-arrow-left"></i> 返回
+                        </button>
+                        <h4 class="mb-1" id="currentProjectName" style="font-weight: 600; color: #1d1d1f; font-size: 22px;"></h4>
+                        <p class="text-muted mb-0" style="font-size: 13px; margin-top: 4px;" id="currentProjectInfo"></p>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm" onclick="showHistoryWeeks()" style="border-radius: 8px; padding: 6px 14px; font-size: 13px;">
+                            <i class="bi bi-clock-history"></i> 历史周报查询
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 周视图容器 -->
+        <div id="weeksContainer"></div>
+    </div>
+</div>
+
+<!-- 日志预览模态框 -->
+<div class="modal fade" id="logPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">日志预览</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-end mb-3 gap-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick="copyPreviewText()">
+                        <i class="bi bi-clipboard"></i> 复制
+                    </button>
+                    <button class="btn btn-sm btn-primary" id="editLogFromPreviewBtn" onclick="editLogFromPreview()" style="display: none;">
+                        <i class="bi bi-pencil"></i> 编辑
+                    </button>
+                </div>
+                <pre id="previewContent" style="white-space: pre-wrap; word-wrap: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.6; margin: 0; padding: 16px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 历史周查询模态框 -->
+<div class="modal fade" id="historyWeeksModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">历史周报查询</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="historyWeeksList" style="max-height: 400px; overflow-y: auto;">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑日志模态框（复用日志录入页面的编辑逻辑） -->
+<div class="modal fade" id="editLogModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑日志</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editLogForm">
+                    <input type="hidden" id="edit_log_id">
+                    <input type="hidden" id="edit_log_project_id">
+                    <div class="mb-3">
+                        <label class="form-label">日期</label>
+                        <input type="date" class="form-control" id="edit_log_date">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">任务分类</label>
+                        <select class="form-select" id="edit_log_task_category_id">
+                            <option value="">请选择任务分类</option>
+                            {% for category in task_categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">工作内容</label>
+                        <textarea class="form-control" id="edit_log_content" rows="5"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">是否需要支持</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="edit_need_support" id="edit_need_support_no" value="no" checked>
+                                <label class="form-check-label" for="edit_need_support_no">否</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="edit_need_support" id="edit_need_support_yes" value="yes">
+                                <label class="form-check-label" for="edit_need_support_yes">是</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="editSupportFieldsGroup" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">需要产品支持</label>
+                            <input type="text" class="form-control" id="edit_need_product_support" value="无">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">需要研发支持</label>
+                            <input type="text" class="form-control" id="edit_need_dev_support" value="无">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">需要测试支持</label>
+                            <input type="text" class="form-control" id="edit_need_test_support" value="无">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">需要商务支持</label>
+                            <input type="text" class="form-control" id="edit_need_business_support" value="无">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">需要客户支持</label>
+                            <input type="text" class="form-control" id="edit_need_customer_support" value="无">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">下一步计划</label>
+                        <textarea class="form-control" id="edit_log_next_plan" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveLog()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.project-card-log {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+}
+
+.project-card-log:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 与项目中心保持一致的卡片悬浮效果 */
+.project-card {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+}
+.project-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+.week-card {
+    margin-bottom: 40px;
+}
+
+.week-header {
+    padding: 18px 24px;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.1) 0%, rgba(255, 107, 53, 0.05) 100%);
+    border-radius: 16px 16px 0 0;
+    border-bottom: 1px solid rgba(255, 107, 53, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.week-header h6 {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: -0.2px;
+}
+
+.week-log-count {
+    font-size: 12px;
+    color: #6e6e73;
+    background: rgba(255, 255, 255, 0.6);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.date-group {
+    margin-bottom: 24px;
+}
+
+.date-group-header {
+    padding: 12px 20px;
+    background: rgba(0, 0, 0, 0.02);
+    border-left: 3px solid #ff6b35;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 12px;
+}
+
+.date-group-header .date-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #1d1d1f;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.date-group-header .weekday {
+    font-size: 13px;
+    color: #6e6e73;
+    font-weight: 400;
+}
+
+/* 日历视图样式 */
+.calendar-view {
+    width: 100%;
+}
+
+.calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.calendar-day {
+    background: #ffffff;
+    border: 1.5px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 140px;
+    position: relative;
+}
+
+.calendar-day:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-color: #ff6b35;
+}
+
+.calendar-day.today {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.1) 0%, rgba(255, 107, 53, 0.05) 100%);
+    border-color: #ff6b35;
+    border-width: 2px;
+}
+
+.calendar-day.has-logs {
+    border-color: rgba(255, 107, 53, 0.4);
+}
+
+.calendar-day-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.calendar-weekday {
+    font-size: 12px;
+    color: #6e6e73;
+    font-weight: 500;
+}
+
+.calendar-today-badge {
+    background: #ff6b35;
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.calendar-day-number {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1d1d1f;
+    line-height: 1;
+    margin: 8px 0;
+}
+
+.calendar-day-footer {
+    width: 100%;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.calendar-log-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #ff6b35;
+    font-weight: 600;
+    background: rgba(255, 107, 53, 0.1);
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.calendar-empty-text {
+    font-size: 11px;
+    color: #8e8e93;
+    font-style: italic;
+}
+
+@media (max-width: 768px) {
+    .calendar-week {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .calendar-day {
+        min-height: 120px;
+        padding: 12px;
+    }
+    
+    .calendar-day-number {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 576px) {
+    .calendar-week {
+        grid-template-columns: 1fr;
+    }
+}
+
+.log-item-card {
+    border: 0.5px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.log-item-card:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    border-color: rgba(255, 107, 53, 0.3);
+}
+
+.log-item-card:last-child {
+    margin-bottom: 0;
+}
+
+.log-content-preview {
+    color: #1d1d1f;
+    font-size: 14px;
+    line-height: 1.7;
+    margin: 12px 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.log-category-badge {
+    background: rgba(255, 107, 53, 0.12);
+    color: #ff6b35;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.log-date-badge {
+    color: #6e6e73;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.next-plan-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.next-plan-label {
+    font-size: 12px;
+    color: #6e6e73;
+    margin-bottom: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.next-plan-content {
+    font-size: 14px;
+    color: #1d1d1f;
+    line-height: 1.6;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.empty-state-icon {
+    font-size: 64px;
+    color: #d1d1d6;
+    margin-bottom: 20px;
+}
+
+.empty-state-text {
+    color: #6e6e73;
+    font-size: 15px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allProjects = [];
+let taskCategories = [];
+let currentProjectId = null;
+
+$(document).ready(function() {
+    // 如果通过 ?project_id=xx 跳转过来，进入页面后自动打开该项目的日志视图
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialProjectId = parseInt(urlParams.get('project_id') || '', 10);
+    // 加载项目列表和任务分类
+    $.get('/api/projects', function(data) {
+        allProjects = data;
+        loadProjects();
+        if (!isNaN(initialProjectId)) {
+            // 稍作延迟以确保渲染完成后再定位到该项目
+            setTimeout(function() {
+                const exists = allProjects.some(p => p.id === initialProjectId);
+                if (exists) {
+                    viewProjectLogs(initialProjectId);
+                }
+            }, 0);
+        }
+    });
+    
+    $.get('/api/task-categories', function(data) {
+        taskCategories = data;
+    });
+    
+    // 编辑日志的支持字段切换
+    $('input[name="edit_need_support"]').on('change', function() {
+        const needSupport = $(this).val() === 'yes';
+        if (needSupport) {
+            $('#editSupportFieldsGroup').slideDown(300);
+        } else {
+            $('#editSupportFieldsGroup').slideUp(300);
+            $('#edit_need_product_support, #edit_need_dev_support, #edit_need_test_support, #edit_need_business_support, #edit_need_customer_support').val('无');
+        }
+    });
+});
+
+function loadProjects() {
+    if (allProjects.length === 0) {
+        $('#projectsList').html(`
+            <div class="col-12">
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-folder-x"></i>
+                    </div>
+                    <p class="empty-state-text">暂无项目，请先创建项目</p>
+                    <a href="/projects" class="btn btn-primary mt-3" style="border-radius: 10px;">
+                        <i class="bi bi-plus-circle"></i> 创建项目
+                    </a>
+                </div>
+            </div>
+        `);
+        return;
+    }
+    
+    // 获取项目统计信息
+    const projectIds = allProjects.map(p => p.id);
+    const statsPromises = projectIds.map(id => 
+        $.get(`/api/projects/${id}/stats`).then(stats => ({ id, stats }))
+    );
+    
+    Promise.all(statsPromises).then(function(statsResults) {
+        const statsMap = {};
+        statsResults.forEach(function(result) {
+            statsMap[result.id] = result.stats;
+        });
+        
+        let html = '';
+        allProjects.forEach(function(project) {
+            const stats = statsMap[project.id] || { log_count: 0, latest_log_date: null };
+            const logCount = stats.log_count || 0;
+            const latestLogDate = stats.latest_log_date || null;
+            let dateDisplay = '';
+            if (latestLogDate) {
+                const date = new Date(latestLogDate);
+                dateDisplay = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            }
+            html += `
+                <div class="col-12 col-md-6 col-lg-4 project-card-wrapper" data-id="${project.id}">
+                    <div class="card project-card" style="height: 100%; cursor: pointer; transition: all 0.3s ease;" onclick="viewProjectLogs(${project.id})">
+                        <div class="card-body" style="padding: 24px;">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div style="flex: 1;">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <h5 class="mb-0" style="font-weight: 600; color: #1d1d1f; font-size: 18px;">${escapeHtml(project.name)}</h5>
+                                    </div>
+                                    ${project.hospital_name ? `
+                                    <p class="text-muted mb-0" style="font-size: 13px; margin-top: 4px;">
+                                        <i class="bi bi-hospital"></i> ${escapeHtml(project.hospital_name)}
+                                    </p>
+                                    ` : ''}
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown" onclick="event.stopPropagation();" style="padding: 4px 8px; border: none;">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="/log/create?project_id=${project.id}" onclick="event.stopPropagation();">
+                                            <i class="bi bi-plus-circle"></i> 创建日志
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="/logs?project_id=${project.id}" onclick="event.stopPropagation();">
+                                            <i class="bi bi-list-ul"></i> 查看日志
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            ${project.region ? `
+                            <div class="mb-3">
+                                <span class="badge" style="background: rgba(255, 107, 53, 0.1); color: #ff6b35; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px;">
+                                    <i class="bi bi-geo-alt"></i> ${escapeHtml(project.region)}
+                                </span>
+                            </div>
+                            ` : ''}
+                            ${project.project_scope ? `
+                            <div class="mb-3" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                ${project.project_scope.split('、').map(scope => scope.trim()).filter(scope => scope).map(scope => `
+                                    <span class="badge" style="background: rgba(52, 152, 219, 0.1); color: #3498db; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap;">
+                                        ${escapeHtml(scope)}
+                                    </span>
+                                `).join('')}
+                            </div>
+                            ` : ''}
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-3" style="border-top: 0.5px solid rgba(0, 0, 0, 0.1);">
+                                <div>
+                                    <div style="font-size: 12px; color: #6e6e73; margin-bottom: 4px;">日志数量</div>
+                                    <div style="font-size: 20px; font-weight: 600; color: #1d1d1f;">${logCount}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div style="font-size: 12px; color: #6e6e73; margin-bottom: 4px;">最近更新</div>
+                                    <div style="font-size: 14px; font-weight: 500; color: #1d1d1f;">
+                                        ${dateDisplay || '<span class="text-muted">暂无</span>'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        $('#projectsList').html(html);
+        initLogsProjectsSortable();
+    }).catch(function() {
+        // 如果获取统计信息失败，仍然显示项目列表
+        let html = '';
+        allProjects.forEach(function(project) {
+            html += `
+                <div class="col-12 col-md-6 col-lg-4 project-card-wrapper" data-id="${project.id}">
+                    <div class="card project-card" style="height: 100%; cursor: pointer; transition: all 0.3s ease;" onclick="window.location.href='/log/create?project_id=${project.id}'">
+                        <div class="card-body" style="padding: 24px;">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div style="flex: 1;">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <h5 class="mb-0" style="font-weight: 600; color: #1d1d1f; font-size: 18px;">${escapeHtml(project.name)}</h5>
+                                    </div>
+                                    ${project.hospital_name ? `
+                                    <p class="text-muted mb-0" style="font-size: 13px; margin-top: 4px;">
+                                        <i class="bi bi-hospital"></i> ${escapeHtml(project.hospital_name)}
+                                    </p>
+                                    ` : ''}
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown" onclick="event.stopPropagation();" style="padding: 4px 8px; border: none;">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="/log/create?project_id=${project.id}" onclick="event.stopPropagation();">
+                                            <i class="bi bi-plus-circle"></i> 创建日志
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="/logs?project_id=${project.id}" onclick="event.stopPropagation();">
+                                            <i class="bi bi-list-ul"></i> 查看日志
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            ${project.region ? `
+                            <div class="mb-3">
+                                <span class="badge" style="background: rgba(255, 107, 53, 0.1); color: #ff6b35; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px;">
+                                    <i class="bi bi-geo-alt"></i> ${escapeHtml(project.region)}
+                                </span>
+                            </div>
+                            ` : ''}
+                            ${project.project_scope ? `
+                            <div class="mb-3" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                ${project.project_scope.split('、').map(scope => scope.trim()).filter(scope => scope).map(scope => `
+                                    <span class="badge" style="background: rgba(52, 152, 219, 0.1); color: #3498db; font-weight: 500; padding: 4px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap;">
+                                        ${escapeHtml(scope)}
+                                    </span>
+                                `).join('')}
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        $('#projectsList').html(html);
+        initLogsProjectsSortable();
+    });
+}
+
+function viewProjectLogs(projectId) {
+    currentProjectId = projectId;
+    const project = allProjects.find(p => p.id === projectId);
+    if (!project) return;
+    
+    $('#currentProjectName').text(project.name);
+    
+    // 设置项目信息
+    let projectInfo = '';
+    if (project.hospital_name) {
+        projectInfo += `<i class="bi bi-hospital"></i> ${escapeHtml(project.hospital_name)}`;
+    }
+    if (project.project_scope) {
+        if (projectInfo) projectInfo += ' · ';
+        projectInfo += `<i class="bi bi-tags"></i> ${escapeHtml(project.project_scope)}`;
+    }
+    $('#currentProjectInfo').html(projectInfo || '<span class="text-muted">暂无额外信息</span>');
+    
+    $('#projectsView').hide();
+    $('#logsView').show();
+    
+    // 滚动到顶部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    loadProjectLogs(projectId);
+}
+
+function backToProjects() {
+    currentProjectId = null;
+    $('#logsView').hide();
+    $('#projectsView').show();
+    $('#weeksContainer').html('');
+}
+
+// 确保加载 SortableJS 后再初始化
+function ensureSortable(thenInit) {
+    if (typeof Sortable !== 'undefined') {
+        thenInit();
+        return;
+    }
+    const existing = document.querySelector('script[data-role=\"sortablejs\"]');
+    if (existing) {
+        existing.addEventListener('load', thenInit, { once: true });
+        return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js';
+    s.async = true;
+    s.defer = true;
+    s.setAttribute('data-role', 'sortablejs');
+    s.addEventListener('load', thenInit, { once: true });
+    document.body.appendChild(s);
+}
+
+let __logs_isSorting = false;
+
+function cardClick(projectId) {
+    if (__logs_isSorting) {
+        // 忽略拖拽中的点击
+        return;
+    }
+    viewProjectLogs(projectId);
+}
+
+function initLogsProjectsSortable() {
+    const container = document.getElementById('projectsList');
+    if (!container) return;
+    const STORAGE_KEY = 'order_logs_projects';
+
+    function setup() {
+        function isMobileLike() {
+            return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+                   (typeof navigator !== 'undefined' && /Mobile|Android|iP(ad|hone)|Phone/i.test(navigator.userAgent)) ||
+                   (window.innerWidth && window.innerWidth < 768);
+        }
+
+        // 应用保存顺序
+        (function applySavedOrder() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+            try {
+                const ids = JSON.parse(saved);
+                const map = {};
+                Array.from(container.children).forEach(el => {
+                    const id = el.getAttribute('data-id');
+                    if (id) map[id] = el;
+                });
+                ids.forEach(id => {
+                    if (map[id]) container.appendChild(map[id]);
+                });
+            } catch (e) {
+                console.warn('[日志中心] 应用保存顺序失败', e);
+            }
+        })();
+
+        // 初始化拖拽（移动端禁用）
+        if (!isMobileLike()) {
+            new Sortable(container, {
+                animation: 150,
+                handle: '.project-card',
+                draggable: '.project-card-wrapper',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onStart: function() {
+                    __logs_isSorting = true;
+                },
+                onEnd: function() {
+                    const ids = Array.from(container.children).map(el => el.getAttribute('data-id')).filter(Boolean);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+                    // 稍作延迟再恢复点击
+                    setTimeout(function(){ __logs_isSorting = false; }, 50);
+                    // 同步到后端（用户级记忆）
+                    try {
+                        $.ajax({
+                            url: '/api/project-order',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ order: ids.map(id => parseInt(id, 10)) })
+                        });
+                    } catch (e) {}
+                }
+            });
+        }
+    }
+
+    ensureSortable(setup);
+}
+
+// 计算当前周的开始日期（周一）
+function getCurrentWeekStart() {
+    const today = new Date();
+    const day = today.getDay(); // 0 = 周日, 1 = 周一, ..., 6 = 周六
+    // 计算到周一的差值
+    const diff = day === 0 ? -6 : 1 - day; // 周日需要减6天，其他天需要减(day-1)天
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diff);
+    monday.setHours(0, 0, 0, 0);
+    const year = monday.getFullYear();
+    const month = String(monday.getMonth() + 1).padStart(2, '0');
+    const date = String(monday.getDate()).padStart(2, '0');
+    return `${year}-${month}-${date}`;
+}
+
+// 显示历史周查询模态框
+function showHistoryWeeks() {
+    if (!currentProjectId) return;
+    
+    const modal = new bootstrap.Modal(document.getElementById('historyWeeksModal'));
+    modal.show();
+    
+    // 加载所有周列表
+    $.get('/api/weeks', { project_id: currentProjectId }, function(weeks) {
+        if (!weeks || weeks.length === 0) {
+            $('#historyWeeksList').html('<div class="text-center py-3 text-muted">暂无历史周记录</div>');
+            return;
+        }
+        
+        const currentWeekStart = getCurrentWeekStart();
+        let html = '<div class="list-group">';
+        
+        weeks.forEach(function(week) {
+            const isCurrentWeek = week.week_start === currentWeekStart;
+            if (isCurrentWeek) return; // 跳过当前周
+            
+            html += `
+                <a href="#" class="list-group-item list-group-item-action" onclick="event.preventDefault(); loadHistoryWeek('${week.week_start}', '${week.display}');" style="border-radius: 8px; margin-bottom: 8px; border: 1px solid #e9ecef; transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#f8f9fa'; this.style.borderColor='#007bff';" onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#e9ecef';">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1" style="font-weight: 600; color: #1d1d1f; font-size: 15px;">
+                                <i class="bi bi-calendar-week"></i> ${escapeHtml(week.display)}
+                            </h6>
+                            <small class="text-muted">${week.week_start} 至 ${week.week_end}</small>
+                        </div>
+                        <i class="bi bi-chevron-right text-muted"></i>
+                    </div>
+                </a>
+            `;
+        });
+        
+        html += '</div>';
+        
+        if (html === '<div class="list-group"></div>') {
+            html = '<div class="text-center py-3 text-muted">暂无历史周记录</div>';
+        }
+        
+        $('#historyWeeksList').html(html);
+    }).fail(function() {
+        $('#historyWeeksList').html('<div class="text-center py-3 text-danger">加载失败，请重试</div>');
+    });
+}
+
+// 加载历史周日志
+function loadHistoryWeek(weekStart, weekDisplay) {
+    if (!currentProjectId) return;
+    
+    // 关闭模态框
+    const modal = bootstrap.Modal.getInstance(document.getElementById('historyWeeksModal'));
+    if (modal) modal.hide();
+    
+    // 加载该周的日志
+    $('#weeksContainer').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></div>');
+    
+    $.get('/api/logs', { project_id: currentProjectId, week_start: weekStart }, function(logs) {
+        if (!logs || logs.length === 0) {
+            $('#weeksContainer').html(`
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-journal-x"></i>
+                    </div>
+                    <p class="empty-state-text">该周暂无日志记录</p>
+                </div>
+            `);
+            return;
+        }
+        
+        // 渲染周日志（复用现有逻辑）
+        renderWeekLogs(logs, weekStart, weekDisplay);
+    }).fail(function() {
+        $('#weeksContainer').html('<div class="text-center py-5 text-danger">加载失败，请重试</div>');
+    });
+}
+
+// 存储当前预览的日志ID
+let currentPreviewLogId = null;
+
+// 渲染周日志（日历视图）
+function renderWeekLogs(logs, weekStart, weekDisplay) {
+    // 按日期分组
+    const logsByDate = {};
+    logs.forEach(function(log) {
+        const dateKey = log.date;
+        if (!logsByDate[dateKey]) {
+            logsByDate[dateKey] = [];
+        }
+        logsByDate[dateKey].push(log);
+    });
+    
+    // 计算当前周的所有日期（周一到周日）
+    const weekStartDate = new Date(weekStart);
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(weekStartDate);
+        date.setDate(weekStartDate.getDate() + i);
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        weekDays.push({
+            date: dateStr,
+            dateObj: date,
+            day: date.getDate(),
+            weekDay: ['日', '一', '二', '三', '四', '五', '六'][date.getDay()],
+            logs: logsByDate[dateStr] || []
+        });
+    }
+    
+    // 获取今天的日期字符串
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    
+    let weekHtml = `
+        <div class="card week-card">
+            <div class="week-header">
+                <h6 style="font-weight: 600; color: #1d1d1f; display: flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-calendar-week"></i> ${escapeHtml(weekDisplay)}
+                </h6>
+                <span class="week-log-count">
+                    <i class="bi bi-journal-text"></i> ${logs.length} 条日志
+                </span>
+            </div>
+            <div class="card-body" style="padding: 24px;">
+                <div class="calendar-view">
+                    <div class="calendar-week">
+    `;
+    
+    weekDays.forEach(function(dayInfo) {
+        const isToday = dayInfo.date === todayStr;
+        const hasLogs = dayInfo.logs.length > 0;
+        const logCount = dayInfo.logs.length;
+        
+        // 将日志数据转换为字符串，用于onclick（使用URI编码避免转义问题和中文编码问题）
+        const logsJson = dayInfo.logs.length > 0 ? encodeURIComponent(JSON.stringify(dayInfo.logs)) : '';
+        weekHtml += `
+            <div class="calendar-day ${isToday ? 'today' : ''} ${hasLogs ? 'has-logs' : ''}" data-date="${dayInfo.date}" data-logs="${logsJson}" onclick="showDayLogsFromElement(this)">
+                <div class="calendar-day-header">
+                    <span class="calendar-weekday">周${dayInfo.weekDay}</span>
+                    ${isToday ? '<span class="calendar-today-badge">今天</span>' : ''}
+                </div>
+                <div class="calendar-day-number">${dayInfo.day}</div>
+                ${hasLogs ? `
+                <div class="calendar-day-footer">
+                    <span class="calendar-log-badge">
+                        <i class="bi bi-journal-text"></i> ${logCount} 条
+                    </span>
+                </div>
+                ` : `
+                <div class="calendar-day-footer">
+                    <span class="calendar-empty-text">无日志</span>
+                </div>
+                `}
+            </div>
+        `;
+    });
+    
+    weekHtml += `
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $('#weeksContainer').html(weekHtml);
+}
+
+// 从元素中获取数据并显示日志预览
+function showDayLogsFromElement(element) {
+    const dateStr = element.getAttribute('data-date');
+    const logsEncoded = element.getAttribute('data-logs');
+    
+    let logs = [];
+    if (logsEncoded) {
+        try {
+            logs = JSON.parse(decodeURIComponent(logsEncoded));
+        } catch (e) {
+            console.error('解析日志数据失败:', e);
+        }
+    }
+    
+    if (!logs || logs.length === 0) {
+        // 如果没有日志，可以提示创建日志
+        if (confirm('该日期暂无日志，是否创建新日志？')) {
+            window.location.href = `/log/create?project_id=${currentProjectId}&date=${dateStr}`;
+        }
+        return;
+    }
+    
+    // 如果有多条日志，显示第一条（或者可以显示列表让用户选择）
+    const log = logs[0];
+    const category = taskCategories.find(c => c.id === log.task_category_id) || {};
+    const project = allProjects.find(p => p.id === log.project_id) || {};
+    const previewText = generateLogPreview(log, project, category);
+    
+    // 存储当前日志ID，用于编辑
+    currentPreviewLogId = log.id;
+    
+    // 显示预览
+    showLogPreview(previewText);
+}
+
+// 从预览中编辑日志
+function editLogFromPreview() {
+    if (currentPreviewLogId) {
+        // 关闭预览模态框
+        const previewModal = bootstrap.Modal.getInstance(document.getElementById('logPreviewModal'));
+        if (previewModal) previewModal.hide();
+        
+        // 调用编辑函数
+        editLog(currentPreviewLogId);
+    }
+}
+
+function loadProjectLogs(projectId) {
+    console.log('开始加载项目日志，projectId:', projectId);
+    $('#weeksContainer').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></div>');
+    
+    // 计算当前周的开始日期
+    const currentWeekStart = getCurrentWeekStart();
+    console.log('当前周开始日期:', currentWeekStart);
+    
+    // 直接加载当前周的日志
+    $.get('/api/logs', { project_id: projectId, week_start: currentWeekStart }, function(logs) {
+        console.log('当前周日志:', logs, '共', logs ? logs.length : 0, '条');
+        
+        if (!logs || logs.length === 0) {
+            $('#weeksContainer').html(`
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-journal-x"></i>
+                    </div>
+                    <p class="empty-state-text">本周暂无日志记录</p>
+                    <a href="/log/create?project_id=${projectId}" class="btn btn-primary mt-3" style="border-radius: 10px;">
+                        <i class="bi bi-plus-circle"></i> 创建第一条日志
+                    </a>
+                </div>
+            `);
+            return;
+        }
+        
+        // 格式化当前周显示文本
+        const today = new Date();
+        const weekEnd = new Date(today);
+        weekEnd.setDate(today.getDate() - today.getDay() + 7); // 本周日
+        const weekStartDate = new Date(currentWeekStart);
+        const weekEndDate = new Date(weekEnd);
+        const weekDisplay = `本周 (${weekStartDate.getFullYear()}-${String(weekStartDate.getMonth() + 1).padStart(2, '0')}-${String(weekStartDate.getDate()).padStart(2, '0')} 至 ${weekEndDate.getFullYear()}-${String(weekEndDate.getMonth() + 1).padStart(2, '0')}-${String(weekEndDate.getDate()).padStart(2, '0')})`;
+        
+        // 渲染当前周日志
+        renderWeekLogs(logs, currentWeekStart, weekDisplay);
+    }).fail(function(xhr, status, error) {
+        console.error('加载当前周日志失败:', error, xhr.responseText);
+        $('#weeksContainer').html(`
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <p class="empty-state-text">加载失败，请重试</p>
+            </div>
+        `);
+    });
+}
+
+function generateLogPreview(log, project, category) {
+    const date = log.date || '';
+    const projectName = project.name || '';
+    const projectManager = project.project_manager || '';
+    const businessManager = project.business_manager || '';
+    const devManager = project.dev_manager || '';
+    const categoryName = category.name || '';
+    
+    let preview = '';
+    if (date) {
+        preview += `${date}实施日志\n`;
+    }
+    preview += `项目名称：${projectName}\n`;
+    if (projectManager) {
+        preview += `项目经理：${projectManager}\n`;
+    }
+    if (businessManager) {
+        preview += `商务经理：${businessManager}\n`;
+    }
+    if (devManager) {
+        preview += `研发经理：${devManager}\n`;
+    }
+    if (categoryName) {
+        preview += `项目状态：${categoryName}\n`;
+    }
+    preview += `今日处理问题：\n${log.content || ''}\n\n`;
+    
+    const needSupport = log.need_product_support && log.need_product_support !== '无' ||
+                       log.need_dev_support && log.need_dev_support !== '无' ||
+                       log.need_test_support && log.need_test_support !== '无' ||
+                       log.need_business_support && log.need_business_support !== '无' ||
+                       log.need_customer_support && log.need_customer_support !== '无';
+    
+    if (needSupport) {
+        preview += `需要产品支持：${log.need_product_support || '无'}\n`;
+        preview += `需要研发支持：${log.need_dev_support || '无'}\n`;
+        preview += `需要测试支持：${log.need_test_support || '无'}\n`;
+        preview += `需要商务支持：${log.need_business_support || '无'}\n`;
+        preview += `需要客户支持：${log.need_customer_support || '无'}\n\n`;
+    }
+    
+    if (log.next_plan && log.next_plan.trim() && log.next_plan.trim() !== '无') {
+        preview += `下一步计划：\n${log.next_plan}`;
+    }
+    
+    return preview;
+}
+
+function showLogPreview(previewText) {
+    $('#previewContent').text(previewText);
+    $('#logPreviewModal').modal('show');
+    // 如果当前预览的日志ID存在，显示编辑按钮
+    if (currentPreviewLogId) {
+        $('#editLogFromPreviewBtn').show();
+    } else {
+        $('#editLogFromPreviewBtn').hide();
+    }
+}
+
+// 当预览模态框关闭时，清除当前日志ID
+$(document).ready(function() {
+    $('#logPreviewModal').on('hidden.bs.modal', function () {
+        currentPreviewLogId = null;
+        $('#editLogFromPreviewBtn').hide();
+    });
+});
+
+function copyPreviewText() {
+    const previewText = $('#previewContent').text();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(previewText).then(function() {
+            alert('已复制到剪贴板');
+        }).catch(function() {
+            alert('复制失败，请手动复制');
+        });
+    } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = previewText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            alert('已复制到剪贴板');
+        } catch (err) {
+            alert('复制失败，请手动复制');
+        }
+        document.body.removeChild(textarea);
+    }
+}
+
+function editLog(logId) {
+    $.get('/api/logs', {}, function(logs) {
+        const log = logs.find(l => l.id === logId);
+        if (!log) {
+            alert('日志不存在');
+            return;
+        }
+        
+        $('#edit_log_id').val(log.id);
+        $('#edit_log_project_id').val(log.project_id);
+        $('#edit_log_date').val(log.date);
+        $('#edit_log_task_category_id').val(log.task_category_id);
+        $('#edit_log_content').val(log.content || '');
+        $('#edit_log_next_plan').val(log.next_plan || '');
+        
+        // 设置支持字段
+        const needSupport = log.need_product_support && log.need_product_support !== '无' ||
+                           log.need_dev_support && log.need_dev_support !== '无' ||
+                           log.need_test_support && log.need_test_support !== '无' ||
+                           log.need_business_support && log.need_business_support !== '无' ||
+                           log.need_customer_support && log.need_customer_support !== '无';
+        
+        if (needSupport) {
+            $('#edit_need_support_yes').prop('checked', true);
+            $('#editSupportFieldsGroup').show();
+            $('#edit_need_product_support').val(log.need_product_support || '无');
+            $('#edit_need_dev_support').val(log.need_dev_support || '无');
+            $('#edit_need_test_support').val(log.need_test_support || '无');
+            $('#edit_need_business_support').val(log.need_business_support || '无');
+            $('#edit_need_customer_support').val(log.need_customer_support || '无');
+        } else {
+            $('#edit_need_support_no').prop('checked', true);
+            $('#editSupportFieldsGroup').hide();
+        }
+        
+        $('#editLogModal').modal('show');
+    });
+}
+
+function saveLog() {
+    const logId = $('#edit_log_id').val();
+    const projectId = $('#edit_log_project_id').val();
+    const needSupport = $('input[name="edit_need_support"]:checked').val() === 'yes';
+    
+    const formData = {
+        project_id: parseInt(projectId),
+        date: $('#edit_log_date').val(),
+        task_category_id: parseInt($('#edit_log_task_category_id').val()),
+        content: $('#edit_log_content').val().trim(),
+        next_plan: $('#edit_log_next_plan').val().trim() || null,
+        need_product_support: needSupport ? ($('#edit_need_product_support').val().trim() || '无') : '无',
+        need_dev_support: needSupport ? ($('#edit_need_dev_support').val().trim() || '无') : '无',
+        need_test_support: needSupport ? ($('#edit_need_test_support').val().trim() || '无') : '无',
+        need_business_support: needSupport ? ($('#edit_need_business_support').val().trim() || '无') : '无',
+        need_customer_support: needSupport ? ($('#edit_need_customer_support').val().trim() || '无') : '无'
+    };
+    
+    if (!formData.content) {
+        alert('请输入工作内容');
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/logs/${logId}`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(formData),
+        success: function(response) {
+            if (response.success) {
+                $('#editLogModal').modal('hide');
+                if (currentProjectId) {
+                    loadProjectLogs(currentProjectId);
+                }
+                alert('保存成功！');
+            } else {
+                alert('保存失败：' + response.message);
+            }
+        },
+        error: function(xhr) {
+            const response = xhr.responseJSON;
+            alert('保存失败：' + (response?.message || '未知错误'));
+        }
+    });
+}
+
+function deleteLog(logId) {
+    if (!confirm('确定要删除这条日志吗？')) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/logs/${logId}`,
+        method: 'DELETE',
+        success: function(response) {
+            if (response.success) {
+                if (currentProjectId) {
+                    loadProjectLogs(currentProjectId);
+                }
+                alert('删除成功！');
+            } else {
+                alert('删除失败：' + response.message);
+            }
+        },
+        error: function(xhr) {
+            alert('删除失败');
+        }
+    });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+</script>
+{% endblock %}

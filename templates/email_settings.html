@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}邮件设置 - Fusion-AI日志记录系统{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="mb-0" style="font-weight: 600; color: #1d1d1f;">
+                <i class="bi bi-envelope"></i> 邮件发送设置
+            </h4>
+            <p class="text-muted mb-0" style="font-size: 14px; margin-top: 4px;">配置每日与每周的自动发送，及测试发送</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">QQ邮箱</label>
+                <input type="email" class="form-control" id="qq_email" placeholder="例如：123456@qq.com" value="{{ (setting.qq_email if setting else '') }}">
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="daily_enabled" {% if setting and setting.daily_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="daily_enabled">开启每日发送（固定每日 07:00）</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">每日发送时间</label>
+                        <input type="time" class="form-control" id="daily_time" value="{{ (setting.daily_time if setting and setting.daily_time else '07:00') }}">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="weekly_enabled" {% if setting and setting.weekly_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="weekly_enabled">开启每周发送</label>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label">每周发送星期</label>
+                            <select class="form-select" id="weekly_weekday">
+                                {% set wk = (setting.weekly_weekday if setting and setting.weekly_weekday is not none else 4) %}
+                                <option value="0" {% if wk==0 %}selected{% endif %}>周一</option>
+                                <option value="1" {% if wk==1 %}selected{% endif %}>周二</option>
+                                <option value="2" {% if wk==2 %}selected{% endif %}>周三</option>
+                                <option value="3" {% if wk==3 %}selected{% endif %}>周四</option>
+                                <option value="4" {% if wk==4 %}selected{% endif %}>周五</option>
+                                <option value="5" {% if wk==5 %}selected{% endif %}>周六</option>
+                                <option value="6" {% if wk==6 %}selected{% endif %}>周日</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">每周发送时间</label>
+                            <input type="time" class="form-control" id="weekly_time" value="{{ (setting.weekly_time if setting and setting.weekly_time else '07:00') }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" onclick="saveSettings()">
+                    <i class="bi bi-save"></i> 保存设置
+                </button>
+                <button class="btn btn-outline-primary" onclick="testSend()">
+                    <i class="bi bi-send"></i> 测试发送
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function saveSettings() {
+    const payload = {
+        qq_email: ($('#qq_email').val() || '').trim(),
+        daily_enabled: $('#daily_enabled').is(':checked'),
+        weekly_enabled: $('#weekly_enabled').is(':checked'),
+        daily_time: ($('#daily_time').val() || '07:00').slice(0,5),
+        weekly_weekday: parseInt($('#weekly_weekday').val() || '4', 10),
+        weekly_time: ($('#weekly_time').val() || '07:00').slice(0,5)
+    };
+    $.ajax({
+        url: '/api/email-settings',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(resp) {
+            if (resp.success) {
+                alert('保存成功');
+            } else {
+                alert('保存失败：' + (resp.message || '未知错误'));
+            }
+        },
+        error: function(xhr) {
+            const response = xhr.responseJSON;
+            alert('保存失败：' + (response?.message || '未知错误'));
+        }
+    });
+}
+
+function testSend() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 发送中...';
+    
+    $.ajax({
+        url: '/api/email/test',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({}),
+        success: function(resp) {
+            console.log('邮件测试响应:', resp);
+            if (resp && resp.success) {
+                alert('✓ 测试发送成功！\n\n请检查您的邮箱（包括垃圾邮件文件夹）');
+            } else {
+                const errorMsg = (resp && resp.message) ? resp.message : '未知错误';
+                console.error('邮件发送失败:', errorMsg, resp);
+                alert('✗ 发送失败：' + errorMsg);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('邮件测试请求失败:', {
+                status: xhr.status,
+                statusText: xhr.statusText,
+                responseText: xhr.responseText,
+                error: error
+            });
+            
+            let errorMsg = '未知错误';
+            try {
+                const response = xhr.responseJSON;
+                if (response && response.message) {
+                    errorMsg = response.message;
+                } else if (xhr.responseText) {
+                    try {
+                        const parsed = JSON.parse(xhr.responseText);
+                        if (parsed.message) {
+                            errorMsg = parsed.message;
+                        }
+                    } catch (e) {
+                        errorMsg = xhr.responseText.substring(0, 200);
+                    }
+                } else if (xhr.status === 0) {
+                    errorMsg = '网络连接失败，请检查网络';
+                } else if (xhr.status >= 500) {
+                    errorMsg = '服务器错误（' + xhr.status + '），请查看服务器日志';
+                } else if (xhr.status === 400) {
+                    errorMsg = '请求参数错误（' + xhr.status + '）';
+                } else if (xhr.status === 401 || xhr.status === 403) {
+                    errorMsg = '权限不足，请重新登录';
+                } else {
+                    errorMsg = '请求失败（状态码：' + xhr.status + '）';
+                }
+            } catch (e) {
+                console.error('解析错误响应失败:', e);
+                errorMsg = '解析错误信息失败：' + error;
+            }
+            alert('✗ 发送失败：' + errorMsg + '\n\n请按 F12 打开控制台查看详细错误信息');
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+}
+</script>
+{% endblock %}
+
+

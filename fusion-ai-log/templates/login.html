@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}登录 - Fusion-AI日志记录系统{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: calc(100vh - 200px);">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-box-arrow-in-right"></i> 登录
+                </h4>
+            </div>
+            <div class="card-body">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <!-- 自动登录加载提示 -->
+                <div id="autoLoginLoading" style="display: none;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">正在验证设备...</span>
+                        </div>
+                        <p class="mt-3 text-muted">正在验证设备信息，请稍候...</p>
+                    </div>
+                </div>
+                
+                <!-- 登录表单（设备不匹配时显示） -->
+                <form method="POST" action="{{ url_for('login') }}" id="loginForm" style="display: none;">
+                    <input type="hidden" id="mac_address" name="mac_address">
+                    
+                    <div class="mb-3">
+                        <label for="real_name" class="form-label">真实姓名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="real_name" name="real_name" required autofocus placeholder="请输入您的真实姓名">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="multi_device_token" class="form-label">多设备登录口令</label>
+                        <input type="text" class="form-control" id="multi_device_token" name="multi_device_token" placeholder="如使用新设备，请输入多设备登录口令">
+                        <small class="text-muted">仅在非首次注册设备上登录时需要</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right"></i> 登录
+                        </button>
+                    </div>
+                </form>
+                
+                <script>
+                // 获取MAC地址（与注册页面相同的逻辑）
+                function getDeviceFingerprint() {
+                    if (localStorage.getItem('device_mac')) {
+                        return localStorage.getItem('device_mac');
+                    }
+                    
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.textBaseline = 'top';
+                    ctx.font = '14px Arial';
+                    ctx.fillText('Device fingerprint', 2, 2);
+                    
+                    const fingerprint = canvas.toDataURL();
+                    const features = [
+                        navigator.userAgent,
+                        navigator.language,
+                        screen.width + 'x' + screen.height,
+                        new Date().getTimezoneOffset(),
+                        fingerprint
+                    ].join('|');
+                    
+                    let hash = 0;
+                    for (let i = 0; i < features.length; i++) {
+                        const char = features.charCodeAt(i);
+                        hash = ((hash << 5) - hash) + char;
+                        hash = hash & hash;
+                    }
+                    
+                    const mac = Math.abs(hash).toString(16).padStart(12, '0');
+                    const formattedMac = mac.match(/.{1,2}/g).join(':');
+                    
+                    localStorage.setItem('device_mac', formattedMac);
+                    return formattedMac;
+                }
+                
+                document.addEventListener('DOMContentLoaded', function() {
+                    const mac = getDeviceFingerprint();
+                    document.getElementById('mac_address').value = mac;
+                    
+                    // 检查设备是否已注册，如果匹配则自动登录
+                    $('#autoLoginLoading').show();
+                    
+                    $.get('/api/check-device', { mac_address: mac }, function(response) {
+                        $('#autoLoginLoading').hide();
+                        
+                        if (response.matched) {
+                            // 设备匹配，自动登录
+                            window.location.href = '/login?mac_address=' + encodeURIComponent(mac);
+                        } else {
+                            // 设备不匹配：展示登录表单，由用户选择“立即登录”或“立即注册”
+                            $('#loginForm').show();
+                        }
+                    }).fail(function() {
+                        // 请求失败：同样展示登录表单，避免无反应
+                        $('#autoLoginLoading').hide();
+                        $('#loginForm').show();
+                    });
+                });
+                </script>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <p class="text-muted mb-0">还没有账号？</p>
+                    <a href="{{ url_for('register') }}" class="btn btn-outline-primary mt-2">
+                        <i class="bi bi-person-plus"></i> 立即注册
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
